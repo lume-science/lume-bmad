@@ -1,6 +1,6 @@
 from typing import Any
 from lume.model import LUMEModel
-# from pytao import Tao
+from pytao import Tao
 
 from lume_bmad.utils import (
     SLAC2BmadTransformer,
@@ -50,7 +50,7 @@ class LUMEBmadModel(LUMEModel):
 
         """
 
-        # self.tao = Tao(f"-init {init_file} -noplot")
+        self.tao = Tao(f"-init {init_file} -noplot")
 
         # import control and output variables
         self._control_variables = {}
@@ -72,7 +72,7 @@ class LUMEBmadModel(LUMEModel):
 
         # get initial state of the model
         self._state = {}
-        # self.update_state()
+        self.update_state()
 
         self._initial_state = self._state.copy()
 

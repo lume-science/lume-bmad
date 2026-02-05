@@ -1,6 +1,7 @@
 import yaml
 from lume.variables import ScalarVariable
 from typing import Any
+from pytao import Tao
 
 # from lcls_live.datamaps import get_datamaps
 
@@ -142,7 +143,7 @@ class SLAC2BmadTransformer:
     def control_name_to_bmad(self) -> dict[str, str]:
         return self._control_name_to_bmad
 
-    def get_tao_property(self, tao, control_name: str):
+    def get_tao_property(self, tao: Tao, control_name: str):
         """
         Get a property of an element from Bmad via Tao and
         return its value in control system (EPICS) units.
@@ -174,7 +175,7 @@ class SLAC2BmadTransformer:
             return ele_attr[attr]
 
     def get_tao_commands(
-        self, tao, pvdata: dict[str, Any], beam_path: str
+        self, tao: Tao, pvdata: dict[str, Any], beam_path: str
     ) -> list[str]:
         """
         Get Tao commands to set a property of an element in Bmad via Tao. Handle
@@ -210,7 +211,7 @@ class SLAC2BmadTransformer:
         return tao_cmds
 
 
-def evaluate_tao(tao, tao_cmds):
+def evaluate_tao(tao: Tao, tao_cmds: list[str]) -> None:
     """
     Evaluate tao commands, toggles lattice_calculation OFF/ON
     between command list
@@ -232,7 +233,7 @@ def evaluate_tao(tao, tao_cmds):
     tao.cmd("set global lattice_calc_on = T")
 
 
-def get_tao_lat_list_outputs(tao):
+def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
     """
     Returns dictionary of Tao output values including element name, twiss and rmats at all elements.
 
