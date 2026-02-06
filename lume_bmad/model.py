@@ -2,14 +2,8 @@ from typing import Any
 from lume.model import LUMEModel
 from pytao import Tao
 
-from lume_bmad.utils import (
-    SLAC2BmadTransformer,
-    import_control_variables,
-    import_output_variables,
-    evaluate_tao,
-    get_tao_lat_list_outputs,
-)
-
+from lume_bmad.utils import evaluate_tao, get_tao_lat_list_outputs
+from lume_bmad.transformer import BmadTransformer
 
 class LUMEBmadModel(LUMEModel):
     """
@@ -33,8 +27,9 @@ class LUMEBmadModel(LUMEModel):
     def __init__(
         self,
         init_file: str,
-        control_variable_file: str,
-        output_variable_file: str,
+        control_variables: str,
+        output_variables: str,
+        transformer: BmadTransformer,
     ):
         """
         Initialize the Bmad model.
@@ -43,32 +38,26 @@ class LUMEBmadModel(LUMEModel):
         ---------
         init_file: str
             Path to the Tao init file.
-        control_variable_file: str
-            Path to the YAML file containing control variable definitions.
-        output_variable_file: str
-            Path to the YAML file containing output variable definitions.
+        control_variables: dict[str, ScalarVariable]
+            Dictionary of control variables.
+        output_variables: dict[str, ScalarVariable]
+            Dictionary of output variables.
+        transformer: BmadTransformer
+            Transformer object for mapping between control variable names and Bmad element names + attributes.
 
         """
 
         self.tao = Tao(f"-init {init_file} -noplot")
 
         # import control and output variables
-        self._control_variables = {}
-        self._read_only_variables = {}
-
-        # Define control system variables
-        self._control_variables, self._control_name_to_bmad = import_control_variables(
-            control_variable_file
-        )
-
-        # Define read-only output variables
-        self._read_only_variables = import_output_variables(output_variable_file)
+        self._control_variables = control_variables
+        self._read_only_variables = output_variables
 
         # add both control and read-only variables to the list of model variables
         self._variables = {**self._control_variables, **self._read_only_variables}
 
         # create transformer for mapping between control names and bmad names
-        self.transformer = SLAC2BmadTransformer(self._control_name_to_bmad)
+        self.transformer = transformer
 
         # get initial state of the model
         self._state = {}

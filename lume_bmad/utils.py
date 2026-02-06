@@ -1,6 +1,7 @@
 import yaml
 from lume.variables import ScalarVariable
 from typing import Any
+from lume_bmad.transformer import BmadTransformer
 from pytao import Tao
 
 # from lcls_live.datamaps import get_datamaps
@@ -43,6 +44,8 @@ def import_control_variables(control_variable_file: str):
     """
     Import control variables from a YAML file and define them as ScalarVariables.
     Also get the mapping between device PV names and Bmad element names.
+
+    TODO: move SLAC specific mapping and unit conversions to slac-tools
 
     Parameters
     ----------
@@ -87,6 +90,8 @@ def import_output_variables(output_variable_file: str):
     Import output variables from a YAML file and define them as ScalarVariables.
     Note that output variables are read-only.
 
+    TODO: move SLAC specific mapping and unit conversions to slac-tools
+
     Parameters
     ----------
     output_variable_file: str
@@ -121,28 +126,7 @@ def import_output_variables(output_variable_file: str):
 ###############################################################
 
 
-class SLAC2BmadTransformer:
-    """
-    Class that handles transformations between SLAC control system PV
-    names and values and bmad element names and attributes.
-
-    TODO: Move this class to slac-tools
-
-    Attributes
-    ----------
-    control_name_to_bmad: dict[str, str]
-        Mapping between control variable names and Bmad element names + attributes.
-        Example: {"QUAD:Q1:B1_GRAD": "Q1 b1_gradient"}
-
-    """
-
-    def __init__(self, control_name_to_bmad: dict[str, str]):
-        self._control_name_to_bmad = control_name_to_bmad
-
-    @property
-    def control_name_to_bmad(self) -> dict[str, str]:
-        return self._control_name_to_bmad
-
+class SLAC2BmadTransformer(BmadTransformer):
     def get_tao_property(self, tao: Tao, control_name: str):
         """
         Get a property of an element from Bmad via Tao and
