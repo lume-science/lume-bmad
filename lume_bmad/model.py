@@ -1,9 +1,11 @@
 from typing import Any
 from lume.model import LUMEModel
+from lume.variables import Variable
 from pytao import Tao
 
 from lume_bmad.utils import evaluate_tao, get_tao_lat_list_outputs
 from lume_bmad.transformer import BmadTransformer
+
 
 class LUMEBmadModel(LUMEModel):
     """
@@ -15,11 +17,11 @@ class LUMEBmadModel(LUMEModel):
         Mapping between device PV names and Bmad element names.
     element_to_device: dict[str, str]
         Mapping between Bmad element names and device PV names.
-    control_variables: dict[str, ScalarVariable]
+    control_variables: dict[str, Variable]
         Dictionary of control variables that can be read/written.
-    read_only_variables: dict[str, ScalarVariable]
+    read_only_variables: dict[str, Variable]
         Dictionary of read-only output variables.
-    supported_variables: dict[str, ScalarVariable]
+    supported_variables: dict[str, Variable]
         Dictionary of all supported variables (control + read-only).
 
     """
@@ -27,8 +29,8 @@ class LUMEBmadModel(LUMEModel):
     def __init__(
         self,
         init_file: str,
-        control_variables: str,
-        output_variables: str,
+        control_variables: dict[str, Variable],
+        output_variables: dict[str, Variable],
         transformer: BmadTransformer,
     ):
         """
@@ -38,10 +40,11 @@ class LUMEBmadModel(LUMEModel):
         ---------
         init_file: str
             Path to the Tao init file.
-        control_variables: dict[str, ScalarVariable]
+        control_variables: dict[str, Variable]
             Dictionary of control variables.
-        output_variables: dict[str, ScalarVariable]
+        output_variables: dict[str, Variable]
             Dictionary of output variables.
+            TODO: create these at runtime based on the bmad elements and diagnostics
         transformer: BmadTransformer
             Transformer object for mapping between control variable names and Bmad element names + attributes.
 
@@ -108,7 +111,6 @@ class LUMEBmadModel(LUMEModel):
         Update the model state by reading all supported variables.
 
         """
-
         # handle reading all of the control variables
         control_names = list(self.control_variables.keys())  # get list of PV names
         for name in control_names:
@@ -118,7 +120,7 @@ class LUMEBmadModel(LUMEModel):
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
         # handle reading other read-only output variables
-        # TODO: implement other read-only variable types as needed
+        # TODO: implement other read-only variable types (bpms, screens, particle distributions, etc.)
 
     @property
     def control_name_to_bmad(self):
