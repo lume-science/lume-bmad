@@ -39,10 +39,9 @@ TAO_OUTPUT_UNITS = {
 # Utility functions for importing control and output variables
 ################################################################
 
-
 def import_output_variables(output_variable_file: str):
     """
-    Import output variables from a YAML file and define them as ScalarVariables.
+    Import output variables from a YAML file and define them as Variable instances.
     Note that output variables are read-only.
 
     TODO: move SLAC specific mapping and unit conversions to slac-tools
@@ -54,7 +53,7 @@ def import_output_variables(output_variable_file: str):
 
     Returns
     -------
-    dict[str, ScalarVariable]
+    dict[str, Variable]
         Dictionary of output variables mapped by their names.
     """
 

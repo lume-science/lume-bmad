@@ -15,8 +15,8 @@ class BmadTransformer(ABC):
     Attributes
     ----------
     control_name_to_bmad: dict[str, str]
-        Mapping between control variable names and Bmad element names + attributes.
-        Example: {"QUAD:Q1:B1_GRAD": "Q1 b1_gradient"}
+        Mapping between control variable names and Bmad element names.
+        Example: {"QUAD:IN20:511": "Q1"}
 
     """
 
