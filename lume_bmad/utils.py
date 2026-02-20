@@ -1,8 +1,9 @@
 import yaml
 from lume.variables import ScalarVariable
 from typing import Any
-from lume_bmad.transformer import BmadTransformer
 from pytao import Tao
+
+from beamphysics.particles import ParticleGroup
 
 # from lcls_live.datamaps import get_datamaps
 
@@ -38,6 +39,7 @@ TAO_OUTPUT_UNITS = {
 ###############################################################
 # Utility functions for importing control and output variables
 ################################################################
+
 
 def import_output_variables(output_variable_file: str):
     """
@@ -95,6 +97,33 @@ def evaluate_tao(tao: Tao, tao_cmds: list[str]) -> None:
     tao.cmd("set global lattice_calc_on = F")
     tao.cmds(tao_cmds)
     tao.cmd("set global lattice_calc_on = T")
+
+
+def get_bmad_set_beam_command(
+    beam: ParticleGroup, fname: str = "bmad_set_beam.h5", **kwargs
+) -> list[str]:
+    """
+    Generate a Bmad command string to set the beam based on a particle group. This method dumps particles
+    to an HDF5 file and creates a Bmad command to read the beam parameters from that file.
+
+    Parameters
+    ----------
+    beam: ParticleGroup
+        The particle group containing beam parameters.
+    fname: str, optional
+        The filename for the HDF5 file to store beam parameters, by default "bmad_set_beam.h5".
+    **kwargs
+        Additional keyword arguments for the ParticleGroup.write_bmad method.
+
+    Returns
+    -------
+    list[str]
+        List of Bmad commands to set the beam and use it for tracking.
+    """
+    beam.write_bmad(fname, **kwargs)
+
+    commands = [f"set beam_init position_file={fname}", "set global track_type = beam"]
+    return commands
 
 
 def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
