@@ -42,7 +42,7 @@ TAO_OUTPUT_UNITS = {
 
 def import_control_variables(control_variable_file: str):
     """
-    Import control variables from a YAML file and define them as ScalarVariables.
+    Import control variables from a YAML file and define them as Variable instances.
     Also get the mapping between device PV names and Bmad element names.
 
     TODO: move SLAC specific mapping and unit conversions to slac-tools
@@ -54,8 +54,8 @@ def import_control_variables(control_variable_file: str):
 
     Returns
     -------
-    dict[str, ScalarVariable]
-        Dictionary of pv variables to ScalarVariable instances.
+    dict[str, Variable]
+        Dictionary of pv variables to Variable instances.
     dict[str, str]
         Mapping between PV names and Bmad element names + attributes.
     """
@@ -78,7 +78,7 @@ def import_control_variables(control_variable_file: str):
         var_dict[pv_name] = ScalarVariable(
             name=pv_name,
             value_range=(quad["min_value"], quad["max_value"]),
-            unit="kG-m",
+            unit="kG",
             read_only=False,
         )
 
@@ -87,7 +87,7 @@ def import_control_variables(control_variable_file: str):
 
 def import_output_variables(output_variable_file: str):
     """
-    Import output variables from a YAML file and define them as ScalarVariables.
+    Import output variables from a YAML file and define them as Variable instances.
     Note that output variables are read-only.
 
     TODO: move SLAC specific mapping and unit conversions to slac-tools
@@ -99,7 +99,7 @@ def import_output_variables(output_variable_file: str):
 
     Returns
     -------
-    dict[str, ScalarVariable]
+    dict[str, Variable]
         Dictionary of output variables mapped by their names.
     """
 

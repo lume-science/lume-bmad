@@ -109,7 +109,6 @@ class LUMEBmadModel(LUMEModel):
     def update_state(self) -> None:
         """
         Update the model state by reading all supported variables.
-
         """
         # handle reading all of the control variables
         control_names = list(self.control_variables.keys())  # get list of PV names
