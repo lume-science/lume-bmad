@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lume-bmad"
+dynamic = ["version"]
+description = "Tools for using Bmad in LUME"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "SLAC National Accelerator Laboratory"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "lume-base @ git+https://github.com/slaclab/lume-base@main",
+    "pytao"
+]
+
+[project.urls]
+Homepage = "https://github.com/lume-science/lume-bmad"
+Repository = "https://github.com/lume-science/lume-bmad"
+Documentation = "https://github.com/lume-science/lume-bmad"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ipykernel",
+    "pre-commit"
+]
+docs = [
+    "pygments",
+    "mkdocs",
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-material",
+    "livereload",
+    "pytkdocs[numpy-style]",
+]
+
+[tool.setuptools.packages.find]
+include = [ "lume_bmad", ]
+namespaces = false
+
+[tool.setuptools.package-data]
+virtual_accelerator = ["py.typed"]
+
+[tool.setuptools_scm]
+version_file = "lume_bmad/_version.py"
+
+[tool.ruff]
+# select = []
+# ignore = []
