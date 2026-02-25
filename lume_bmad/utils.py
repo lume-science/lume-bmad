@@ -4,7 +4,7 @@ from typing import Any
 from lume_bmad.transformer import BmadTransformer
 from pytao import Tao
 
-# from lcls_live.datamaps import get_datamaps
+# from lcls_live.datamaps import get_datamaps 
 
 
 TAO_OUTPUT_UNITS = {
@@ -118,9 +118,35 @@ def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
         output = tao.lat_list("*", k)
         outputs.update(
             {
-                ele + k.replace("ele.", "").replace(".", "_") + "_": val
+                ele + k.replace("ele", ""): val
                 for ele, val in zip(lattice_elements, output)
             }
         )
 
     return outputs
+
+
+def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
+    """
+    Returns dictionary of beam tracking information
+    
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    dict[str, list[Any]]
+        Dictionary mapping beam tracking beam or single particle and beam saved at element list
+
+    """
+    beam_info = {}
+    lines = tao.cmd('python show beam')
+    track_type = [l.split('=') for l in lines if "global%track_type" in l][0][1]
+    beam_info['track_type'] =  track_type[2:-1]
+    saved_at = [l.split('=') for l in lines if "saved_at" in l][0][1]
+    saved_at = saved_at.strip(' "').split(',')
+    beam_info['saved_at'] = [s.strip(' ') for s in saved_at]
+
+    return beam_info

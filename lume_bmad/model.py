@@ -3,8 +3,10 @@ from lume.model import LUMEModel
 from lume.variables import Variable
 from pytao import Tao
 
-from lume_bmad.utils import evaluate_tao, get_tao_lat_list_outputs
+from lume_bmad.utils import evaluate_tao, get_tao_lat_list_outputs, get_beam_info
 from lume_bmad.transformer import BmadTransformer
+
+from pmd_beamphysics import ParticleGroup
 
 
 class LUMEBmadModel(LUMEModel):
@@ -97,7 +99,7 @@ class LUMEBmadModel(LUMEModel):
         ----------
         values : dict[str, Any]
             Dictionary of variable names and values to set
-        """
+        """ 
 
         # map pvdata to tao commands and evaluate
         tao_cmds = self.transformer.get_tao_commands(self.tao, values, "cu_hxr")
@@ -118,6 +120,16 @@ class LUMEBmadModel(LUMEModel):
         # handle reading twiss functions and rmats at all elements for output variables
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
+        beam_info = get_beam_info(self.tao)
+        print(beam_info)
+        if beam_info['track_type'] == 'beam':
+            for element_name in beam_info['saved_at']:
+                beam_variable = element_name + '_beam'
+                print(beam_variable)
+                beam_at_element = \
+                    {beam_variable: ParticleGroup(data=self.tao.bunch_data(element_name))}
+                self._state.update(beam_at_element)
+                
         # handle reading other read-only output variables
         # TODO: implement other read-only variable types (bpms, screens, particle distributions, etc.)
 
