@@ -121,7 +121,6 @@ class LUMEBmadModel(LUMEModel):
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
         beam_info = get_beam_info(self.tao)
-        print(beam_info)
         if beam_info['track_type'] == 'beam':
             for element_name in beam_info['saved_at']:
                 beam_variable = element_name + '_beam'
