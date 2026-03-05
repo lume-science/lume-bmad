@@ -36,8 +36,8 @@ class LUMEBmadModel(LUMEModel):
         control_variables: dict[str, Variable],
         output_variables: dict[str, Variable],
         transformer: BmadTransformer,
-        input_beam_element: str = None,
-        output_beam_element: str = None,
+        input_beam_element_name: str = None,
+        output_beam_element_name: str = None,
     ):
         """
         Initialize the Bmad model.
@@ -52,10 +52,10 @@ class LUMEBmadModel(LUMEModel):
             Dictionary of output variables.
         transformer: BmadTransformer
             Transformer object for mapping between control variable names and Bmad element names + attributes.
-        input_beam_element: str, optional
+        input_beam_element_name: str, optional
             Name of the element to start tracking for `input_beam` variable. Used for chaining models
             together where the output beam from one model is the input beam for another model.
-        output_beam_element: str, optional
+        output_beam_element_name: str, optional
             Name of the element to end tracking for `output_beam` variable. Used for chaining models
             together where the output beam from one model is the input beam for another model.
 
@@ -73,8 +73,8 @@ class LUMEBmadModel(LUMEModel):
         self.transformer = transformer
 
         # set input and ouput beam elements for tracking
-        self.input_beam_element = input_beam_element
-        self.output_beam_element = output_beam_element
+        self.input_beam_element_name = input_beam_element_name
+        self.output_beam_element_name = output_beam_element_name
 
         # get initial state of the model
         self._state = {}
@@ -140,19 +140,19 @@ class LUMEBmadModel(LUMEModel):
         beam_info = get_beam_info(self.tao)
         if beam_info["track_type"] == "beam":
             self._state.update({"track_type": 1})
-            if self.input_beam_element is not None:
+            if self.input_beam_element_name is not None:
                 self._state.update(
                     {
                         "input_beam": get_particle_group_at_element(
-                            self.tao, self.input_beam_element
+                            self.tao, self.input_beam_element_name
                         )
                     }
                 )
-            if self.output_beam_element is not None:
+            if self.output_beam_element_name is not None:
                 self._state.update(
                     {
                         "output_beam": get_particle_group_at_element(
-                            self.tao, self.output_beam_element
+                            self.tao, self.output_beam_element_name
                         )
                     }
                 )
@@ -181,9 +181,9 @@ class LUMEBmadModel(LUMEModel):
     def supported_variables(self):
         """dictionary of all supported variables"""
         vars = self._variables.copy()
-        if self.input_beam_element is not None:
+        if self.input_beam_element_name is not None:
             vars.update({"input_beam": ParticleGroupVariable("input_beam")})
-        if self.output_beam_element is not None:
+        if self.output_beam_element_name is not None:
             vars.update({"output_beam": ParticleGroupVariable("output_beam")})
 
         return vars
