@@ -185,8 +185,10 @@ class LUMEBmadModel(LUMEModel):
     @input_beam_element_name.setter
     def input_beam_element_name(self, element_name):
         """setter for input_beam_element_name to allow updating the element"""
+        if element_name is None:
+            # if input_beam_element_name is set to None, remove input_beam variable from supported variables
+            self._variables.pop("input_beam", None)
         self._input_beam_element_name = element_name
-
         self._variables.update({"input_beam": ParticleGroupVariable("input_beam")})
 
     @property
@@ -197,8 +199,11 @@ class LUMEBmadModel(LUMEModel):
     @output_beam_element_name.setter
     def output_beam_element_name(self, element_name):
         """setter for output_beam_element_name to allow updating the element"""
-        self._output_beam_element_name = element_name
+        if element_name is None:
+            # if output_beam_element_name is set to None, remove output_beam variable from supported variables
+            self._variables.pop("output_beam", None)
 
+        self._output_beam_element_name = element_name
         self._variables.update({"output_beam": ParticleGroupVariable("output_beam")})
 
     @property
