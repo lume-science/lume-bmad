@@ -2,11 +2,14 @@ from typing import Any
 from lume.model import LUMEModel
 from lume.variables import Variable
 from pytao import Tao
-
-from lume_bmad.utils import evaluate_tao, get_tao_lat_list_outputs, get_beam_info
+from lume_bmad.utils import (
+    evaluate_tao,
+    get_tao_lat_list_outputs,
+    get_beam_info,
+    bmad_to_particle_group)
 from lume_bmad.transformer import BmadTransformer
 
-from pmd_beamphysics import ParticleGroup
+from beamphysics import ParticleGroup
 
 
 class LUMEBmadModel(LUMEModel):
@@ -57,7 +60,6 @@ class LUMEBmadModel(LUMEModel):
         # import control and output variables
         self._control_variables = control_variables
         self._read_only_variables = output_variables
-
         # add both control and read-only variables to the list of model variables
         self._variables = {**self._control_variables, **self._read_only_variables}
 
@@ -100,10 +102,16 @@ class LUMEBmadModel(LUMEModel):
         values : dict[str, Any]
             Dictionary of variable names and values to set
         """ 
-
+        if "track_type" in values.keys():
+            if values["track_type"]:
+                self.tao.cmd('set global track_type = beam')
+            else:
+                self.tao.cmd('set global track_type = single')
         # map pvdata to tao commands and evaluate
         tao_cmds = self.transformer.get_tao_commands(self.tao, values, "cu_hxr")
         evaluate_tao(self.tao, tao_cmds)
+
+        # 
 
         # update state with new input / output values
         self.update_state()
@@ -113,6 +121,7 @@ class LUMEBmadModel(LUMEModel):
         Update the model state by reading all supported variables.
         """
         # handle reading all of the control variables
+        
         control_names = list(self.control_variables.keys())  # get list of PV names
         for name in control_names:
             self._state[name] = self.transformer.get_tao_property(self.tao, name)
@@ -120,18 +129,23 @@ class LUMEBmadModel(LUMEModel):
         # handle reading twiss functions and rmats at all elements for output variables
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
+        beam_variables = self.transformer.get_beam_variables("cu_hxr")
+
         beam_info = get_beam_info(self.tao)
         if beam_info['track_type'] == 'beam':
-            for element_name in beam_info['saved_at']:
-                beam_variable = element_name + '_beam'
-                print(beam_variable)
-                beam_at_element = \
-                    {beam_variable: ParticleGroup(data=self.tao.bunch_data(element_name))}
-                self._state.update(beam_at_element)
+            self._state.update({'track_type': 1})
+            self._state.update({'input_beam':  \
+                        bmad_to_particle_group(self.tao, beam_variables['input_element'])})
+            self._state.update({'output_beam':  \
+                        bmad_to_particle_group(self.tao, beam_variables['output_element'])})
+        else:
+            self._state.update({'track_type': 0})  
+            
                 
         # handle reading other read-only output variables
         # TODO: implement other read-only variable types (bpms, screens, particle distributions, etc.)
 
+        
     @property
     def control_name_to_bmad(self):
         """mapping between control variable PV names and Bmad element names + attributes"""
