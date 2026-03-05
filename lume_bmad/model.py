@@ -65,8 +65,7 @@ class LUMEBmadModel(LUMEModel):
 
         # create transformer for mapping between control names and bmad names
         self.transformer = transformer
-        self.beam_path = self.transformer.get_beam_path()
-        self.beam_variables = self.transformer.get_beam_variables(self.beam_path)
+        self.beam_at_element = self.transformer.get_beam_elements()
 
         # get initial state of the model
         self._state = {}
@@ -110,7 +109,7 @@ class LUMEBmadModel(LUMEModel):
             else:
                 self.tao.cmd('set global track_type = single')
         # map pvdata to tao commands and evaluate
-        tao_cmds = self.transformer.get_tao_commands(self.tao, values, self.beam_path)
+        tao_cmds = self.transformer.get_tao_commands(self.tao, values)
         evaluate_tao(self.tao, tao_cmds)
 
         # 
@@ -135,9 +134,9 @@ class LUMEBmadModel(LUMEModel):
         if beam_info['track_type'] == 'beam':
             self._state.update({'track_type': 1})
             self._state.update({'input_beam':  \
-                get_particle_group_at_element(self.tao, self.beam_variables['input_element'])})
+                get_particle_group_at_element(self.tao, self.beam_at_element['input_element'])})
             self._state.update({'output_beam':  \
-                get_particle_group_at_element(self.tao, self.beam_variables['output_element'])})
+                get_particle_group_at_element(self.tao, self.beam_at_element['output_element'])})
         else:
             self._state.update({'track_type': 0})  
             
