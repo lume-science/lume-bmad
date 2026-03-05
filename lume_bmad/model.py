@@ -6,7 +6,7 @@ from lume_bmad.utils import (
     evaluate_tao,
     get_tao_lat_list_outputs,
     get_beam_info,
-    bmad_to_particle_group)
+    get_particle_group_at_element)
 from lume_bmad.transformer import BmadTransformer
 
 from beamphysics import ParticleGroup
@@ -65,6 +65,8 @@ class LUMEBmadModel(LUMEModel):
 
         # create transformer for mapping between control names and bmad names
         self.transformer = transformer
+        self.beam_path = self.transformer.get_beam_path()
+        self.beam_variables = self.transformer.get_beam_variables(self.beam_path)
 
         # get initial state of the model
         self._state = {}
@@ -108,7 +110,7 @@ class LUMEBmadModel(LUMEModel):
             else:
                 self.tao.cmd('set global track_type = single')
         # map pvdata to tao commands and evaluate
-        tao_cmds = self.transformer.get_tao_commands(self.tao, values, "cu_hxr")
+        tao_cmds = self.transformer.get_tao_commands(self.tao, values, self.beam_path)
         evaluate_tao(self.tao, tao_cmds)
 
         # 
@@ -129,15 +131,13 @@ class LUMEBmadModel(LUMEModel):
         # handle reading twiss functions and rmats at all elements for output variables
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
-        beam_variables = self.transformer.get_beam_variables("cu_hxr")
-
         beam_info = get_beam_info(self.tao)
         if beam_info['track_type'] == 'beam':
             self._state.update({'track_type': 1})
             self._state.update({'input_beam':  \
-                        bmad_to_particle_group(self.tao, beam_variables['input_element'])})
+                get_particle_group_at_element(self.tao, self.beam_variables['input_element'])})
             self._state.update({'output_beam':  \
-                        bmad_to_particle_group(self.tao, beam_variables['output_element'])})
+                get_particle_group_at_element(self.tao, self.beam_variables['output_element'])})
         else:
             self._state.update({'track_type': 0})  
             

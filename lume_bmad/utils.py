@@ -154,7 +154,7 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     return beam_info
 
 
-def bmad_to_particle_group(tao:Tao, element, file_name=None):
+def get_particle_group_at_element(tao:Tao, element, file_name=None):
     """
     returns a ParticleGroup and optionally writes Bmad particles to file
     """
