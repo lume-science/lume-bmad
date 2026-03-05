@@ -178,15 +178,33 @@ class LUMEBmadModel(LUMEModel):
         return self._read_only_variables
 
     @property
+    def input_beam_element_name(self):
+        """name of the element to start tracking for `input_beam` variable"""
+        return self._input_beam_element_name
+
+    @input_beam_element_name.setter
+    def input_beam_element_name(self, element_name):
+        """setter for input_beam_element_name to allow updating the element"""
+        self._input_beam_element_name = element_name
+
+        self._variables.update({"input_beam": ParticleGroupVariable("input_beam")})
+
+    @property
+    def output_beam_element_name(self):
+        """name of the element to end tracking for `output_beam` variable"""
+        return self._output_beam_element_name
+
+    @output_beam_element_name.setter
+    def output_beam_element_name(self, element_name):
+        """setter for output_beam_element_name to allow updating the element"""
+        self._output_beam_element_name = element_name
+
+        self._variables.update({"output_beam": ParticleGroupVariable("output_beam")})
+
+    @property
     def supported_variables(self):
         """dictionary of all supported variables"""
-        vars = self._variables.copy()
-        if self.input_beam_element_name is not None:
-            vars.update({"input_beam": ParticleGroupVariable("input_beam")})
-        if self.output_beam_element_name is not None:
-            vars.update({"output_beam": ParticleGroupVariable("output_beam")})
-
-        return vars
+        return self._variables
 
     def reset(self):
         """Reset the model to its initial state."""
