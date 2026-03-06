@@ -5,8 +5,6 @@ from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
     evaluate_tao,
-    get_tao_lat_list_outputs,
-    get_beam_info,
     get_particle_group_at_element,
 )
 from lume_bmad.transformer import BmadTransformer
@@ -37,6 +35,7 @@ class LUMEBmadModel(LUMEModel):
         control_variables: dict[str, Variable],
         output_variables: dict[str, Variable],
         transformer: BmadTransformer,
+        dump_locations: list[str] = [],
     ):
         """
         Initialize the Bmad model.
@@ -51,6 +50,8 @@ class LUMEBmadModel(LUMEModel):
             Dictionary of output variables.
         transformer: BmadTransformer
             Transformer object for mapping between control variable names and Bmad element names + attributes.
+        dump_locations: list[str], optional
+            List of element names at which to dump the beam distribution in addition to the start and end of the lattice.
 
         """
 
@@ -66,6 +67,7 @@ class LUMEBmadModel(LUMEModel):
             **self._read_only_variables,
             "input_beam": ParticleGroupVariable(name="input_beam"),
             "output_beam": ParticleGroupVariable(name="output_beam", read_only=True),
+            **{f"{ele}_beam": ParticleGroupVariable(name=f"{ele}_beam", read_only=True) for ele in dump_locations}
         }
 
         # add track_type variable to control variables to allow toggling between single particle and beam tracking
@@ -77,7 +79,9 @@ class LUMEBmadModel(LUMEModel):
         self.transformer = transformer
 
         # set dumping of beam distributions at the beginning and end of the lattice
-        self.tao.cmd(f"set beam saved_at = {self.start_element}, {self.end_element}")
+        self._dump_locations = dump_locations
+        elements = ",".join(dump_locations + ["BEGINNING", "END"]) 
+        self.tao.cmd(f"set beam saved_at = {elements}")
 
         # get initial state of the model
         self._state = {}
@@ -143,10 +147,15 @@ class LUMEBmadModel(LUMEModel):
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
             # handle reading the input / output beam distributions
-            if name in ["input_beam", "output_beam"]:
+            if name in ["input_beam", "output_beam"] + [f"{ele}_beam" for ele in self._dump_locations]:
                 if self.tao.tao_global()["track_type"] == "beam":
                     # get element at track start
-                    element_name = self.start_element if name == "input_beam" else self.end_element
+                    if name == "input_beam":
+                        element_name = self.start_element
+                    elif name == "output_beam":
+                        element_name = self.end_element
+                    else:
+                        element_name = name.split("_beam")[0]
                     self._state[name] = get_particle_group_at_element(
                             self.tao, element_name
                         )
