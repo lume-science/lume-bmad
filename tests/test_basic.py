@@ -86,7 +86,3 @@ class TestModel:
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
         assert qf_screen.shape == (100, 100)
-
-                
-
-
