@@ -1,8 +1,12 @@
 import pytest
+import numpy as np
+
 from lume_bmad.model import LUMEBmadModel
-from lume.variables import ScalarVariable
+from lume.variables import NDVariable, ScalarVariable
 from lume_bmad.transformer import BasicTransformer
 from beamphysics import ParticleGroup
+
+from lume_bmad.utils import get_particle_group_at_element
 
 
 class TestModel:
@@ -14,7 +18,7 @@ class TestModel:
         }
         transformer = BasicTransformer({})
 
-        model = LUMEBmadModel("tests/fodo.init", control_variables, {}, transformer)
+        model = LUMEBmadModel("tests/fodo.init", control_variables, {}, transformer, dump_locations=["qf", "qd"])
         return model
 
     def test_model_initialization(self, model):
@@ -23,7 +27,7 @@ class TestModel:
         assert model.start_element == "BEGINNING"
         assert model.end_element == "END"
 
-        assert model.tao.beam(0)["saved_at"] == "BEGINNING, END"
+        assert model.tao.beam(0)["saved_at"] == "qf, qd, BEGINNING, END"
 
         model.set({"qf:B1_GRADIENT": 0.2})
         assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.2
@@ -43,5 +47,46 @@ class TestModel:
         # read the input beam back and check that it is the same as the output beam
         input_beam = model.get(["input_beam"])["input_beam"]
         assert input_beam == output_beam
+
+        # test that beam is being dumped at the correct locations
+        for ele in ["qf", "qd"]:
+            beam = model.get([f"{ele}_beam"])[f"{ele}_beam"]
+            assert isinstance(beam, ParticleGroup)
+            assert beam.n_particle == 1000
+
+    def test_screen(self, model):
+        # set track_type to 1 to enable tracking
+        control_variables = {
+            "qf:B1_GRADIENT": ScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
+            "qd:B1_GRADIENT": ScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
+        }
+        output_variables = {
+            "qf_screen": NDVariable(name="qf_screen", read_only=True, shape=(100, 100)),
+        }
+
+        class ScreenTransformer(BasicTransformer):
+            def get_tao_property(self, tao, control_name):
+                if control_name == "qf_screen":
+                    beam = get_particle_group_at_element(tao, "qf")
+                    # simple screen that counts number of particles
+                    hist, _ = beam.histogramdd("x", "y", bins=(100, 100), range=((-0.1, 0.1), (-0.1, 0.1)))
+                    return hist
+                else:
+                    return super().get_tao_property(tao, control_name)
+
+
+        model = LUMEBmadModel(
+            "tests/fodo.init", 
+            control_variables,
+            output_variables, 
+            ScreenTransformer({}), 
+            dump_locations=["qf", "qd"]
+        )
+        model.set({"track_type": 1})
+        qf_screen = model.get(["qf_screen"])["qf_screen"]
+        assert isinstance(qf_screen, np.ndarray)
+        assert qf_screen.shape == (100, 100)
+
+                
 
 
