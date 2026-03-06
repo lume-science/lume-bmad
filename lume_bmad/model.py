@@ -1,15 +1,14 @@
 from typing import Any
 from lume.model import LUMEModel
-from lume.variables import Variable
+from lume.variables import Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
     evaluate_tao,
     get_tao_lat_list_outputs,
     get_beam_info,
-    get_particle_group_at_element)
+    get_particle_group_at_element,
+)
 from lume_bmad.transformer import BmadTransformer
-
-from beamphysics import ParticleGroup
 
 
 class LUMEBmadModel(LUMEModel):
@@ -37,6 +36,8 @@ class LUMEBmadModel(LUMEModel):
         control_variables: dict[str, Variable],
         output_variables: dict[str, Variable],
         transformer: BmadTransformer,
+        input_beam_element_name: str = None,
+        output_beam_element_name: str = None,
     ):
         """
         Initialize the Bmad model.
@@ -49,9 +50,14 @@ class LUMEBmadModel(LUMEModel):
             Dictionary of control variables.
         output_variables: dict[str, Variable]
             Dictionary of output variables.
-            TODO: create these at runtime based on the bmad elements and diagnostics
         transformer: BmadTransformer
             Transformer object for mapping between control variable names and Bmad element names + attributes.
+        input_beam_element_name: str, optional
+            Name of the element to start tracking for `input_beam` variable. Used for chaining models
+            together where the output beam from one model is the input beam for another model.
+        output_beam_element_name: str, optional
+            Name of the element to end tracking for `output_beam` variable. Used for chaining models
+            together where the output beam from one model is the input beam for another model.
 
         """
 
@@ -65,7 +71,10 @@ class LUMEBmadModel(LUMEModel):
 
         # create transformer for mapping between control names and bmad names
         self.transformer = transformer
-        self.beam_at_element = self.transformer.get_beam_elements()
+
+        # set input and ouput beam elements for tracking
+        self.input_beam_element_name = input_beam_element_name
+        self.output_beam_element_name = output_beam_element_name
 
         # get initial state of the model
         self._state = {}
@@ -102,17 +111,15 @@ class LUMEBmadModel(LUMEModel):
         ----------
         values : dict[str, Any]
             Dictionary of variable names and values to set
-        """ 
+        """
         if "track_type" in values.keys():
             if values["track_type"]:
-                self.tao.cmd('set global track_type = beam')
+                self.tao.cmd("set global track_type = beam")
             else:
-                self.tao.cmd('set global track_type = single')
+                self.tao.cmd("set global track_type = single")
         # map pvdata to tao commands and evaluate
         tao_cmds = self.transformer.get_tao_commands(self.tao, values)
         evaluate_tao(self.tao, tao_cmds)
-
-        # 
 
         # update state with new input / output values
         self.update_state()
@@ -122,7 +129,7 @@ class LUMEBmadModel(LUMEModel):
         Update the model state by reading all supported variables.
         """
         # handle reading all of the control variables
-        
+
         control_names = list(self.control_variables.keys())  # get list of PV names
         for name in control_names:
             self._state[name] = self.transformer.get_tao_property(self.tao, name)
@@ -131,20 +138,30 @@ class LUMEBmadModel(LUMEModel):
         self._state.update(get_tao_lat_list_outputs(self.tao))
 
         beam_info = get_beam_info(self.tao)
-        if beam_info['track_type'] == 'beam':
-            self._state.update({'track_type': 1})
-            self._state.update({'input_beam':  \
-                get_particle_group_at_element(self.tao, self.beam_at_element['input_element'])})
-            self._state.update({'output_beam':  \
-                get_particle_group_at_element(self.tao, self.beam_at_element['output_element'])})
+        if beam_info["track_type"] == "beam":
+            self._state.update({"track_type": 1})
+            if self.input_beam_element_name is not None:
+                self._state.update(
+                    {
+                        "input_beam": get_particle_group_at_element(
+                            self.tao, self.input_beam_element_name
+                        )
+                    }
+                )
+            if self.output_beam_element_name is not None:
+                self._state.update(
+                    {
+                        "output_beam": get_particle_group_at_element(
+                            self.tao, self.output_beam_element_name
+                        )
+                    }
+                )
         else:
-            self._state.update({'track_type': 0})  
-            
-                
+            self._state.update({"track_type": 0})
+
         # handle reading other read-only output variables
         # TODO: implement other read-only variable types (bpms, screens, particle distributions, etc.)
 
-        
     @property
     def control_name_to_bmad(self):
         """mapping between control variable PV names and Bmad element names + attributes"""
@@ -159,6 +176,35 @@ class LUMEBmadModel(LUMEModel):
     def read_only_variables(self):
         """dictionary of read-only output variables"""
         return self._read_only_variables
+
+    @property
+    def input_beam_element_name(self):
+        """name of the element to start tracking for `input_beam` variable"""
+        return self._input_beam_element_name
+
+    @input_beam_element_name.setter
+    def input_beam_element_name(self, element_name):
+        """setter for input_beam_element_name to allow updating the element"""
+        if element_name is None:
+            # if input_beam_element_name is set to None, remove input_beam variable from supported variables
+            self._variables.pop("input_beam", None)
+        self._input_beam_element_name = element_name
+        self._variables.update({"input_beam": ParticleGroupVariable("input_beam")})
+
+    @property
+    def output_beam_element_name(self):
+        """name of the element to end tracking for `output_beam` variable"""
+        return self._output_beam_element_name
+
+    @output_beam_element_name.setter
+    def output_beam_element_name(self, element_name):
+        """setter for output_beam_element_name to allow updating the element"""
+        if element_name is None:
+            # if output_beam_element_name is set to None, remove output_beam variable from supported variables
+            self._variables.pop("output_beam", None)
+
+        self._output_beam_element_name = element_name
+        self._variables.update({"output_beam": ParticleGroupVariable("output_beam")})
 
     @property
     def supported_variables(self):
