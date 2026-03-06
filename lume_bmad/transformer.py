@@ -72,3 +72,30 @@ class BmadTransformer(ABC):
 
         """
         pass
+
+
+class BasicTransformer(BmadTransformer):
+    """
+    Basic implementation of the BmadTransformer that assumes control variable names are the same as Bmad element names
+    and that values can be set directly without any unit conversions or special handling.
+
+    This can be used as a template for implementing more complex transformers for specific facilities.
+
+    Assumes control variable names are in the format "ELEMENT:ATTRIBUTE" where ELEMENT is the name of the Bmad element and
+    ATTRIBUTE is the name of the attribute to set for that element. For example, "QUAD:K1" would
+    refer to the K1 attribute of the QUAD element.
+
+    """
+
+    def get_tao_property(self, tao: Tao, control_name: str):
+        element_name = control_name.split(":")[0]
+        attr = control_name.split(":")[1]
+        return tao.ele_gen_attribs(element_name)[attr]
+
+    def get_tao_commands(self, tao: Tao, pvdata: dict[str, Any]) -> list[str]:
+        commands = []
+        for control_name, value in pvdata.items():
+            bmad_name = control_name.split(":")[0]
+            attr = control_name.split(":")[1]
+            commands.append(f"set ele {bmad_name} {attr} = {value}")
+        return commands

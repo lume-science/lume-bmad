@@ -1,0 +1,24 @@
+!-----------------------------------------
+! fodo.init
+! Example FODO lattice
+!-----------------------------------------
+
+beginning[e_tot] = 6e6
+parameter[geometry] = open
+parameter[particle] = electron
+
+BEGINNING[BETA_A]  =  1.29704949763868189E+001
+BEGINNING[ALPHA_A] = -4.39664934865974200E+000
+BEGINNING[BETA_B]  =  3.47990377067604273E-001
+BEGINNING[ALPHA_B] =  2.93951797746668075E-001
+
+! Define elements
+d: drift, l = 1.0
+
+qf: quadrupole, l = 0.25, k1 = 1.2
+qd: quadrupole, l = 0.25, k1 = -1.2
+
+! Define a FODO cell
+fodo: line = (qf, d, qd, d)
+
+use, fodo
