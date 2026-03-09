@@ -27,7 +27,7 @@ class TestModel:
         assert model.start_element == "BEGINNING"
         assert model.end_element == "END"
 
-        assert model.tao.beam(0)["saved_at"] == "qf, qd, BEGINNING, END"
+        assert model.tao.beam(0)["saved_at"] == "qf,qd,BEGINNING,END"
 
         model.set({"qf:B1_GRADIENT": 0.2})
         assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.2
