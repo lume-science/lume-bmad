@@ -63,11 +63,8 @@ class LUMEBmadModel(LUMEModel):
 
         # import control and output variables
         self._control_variables = control_variables
-        #self._read_only_variables = model_output_variables.update(output_variables)
-        self._read_only_variables = model_output_variables
-
+        self._read_only_variables = model_output_variables | output_variables
         
-
         # add both control and read-only variables to the list of model variables
         self._variables = {
             **self._control_variables, 
