@@ -1,5 +1,5 @@
 import yaml
-from lume.variables import ScalarVariable
+from lume.variables import ScalarVariable, NDVariable
 from typing import Any
 from lume_bmad.transformer import BmadTransformer
 from pytao import Tao
@@ -10,31 +10,31 @@ from pmd_beamphysics import ParticleGroup
 
 
 TAO_OUTPUT_UNITS = {
-    "ele.name": "",
-    "ele.ix_ele": "",
-    "ele.ix_branch": "",
-    "ele.a.beta": "m",
-    "ele.a.alpha": "",
-    "ele.a.eta": "m",
-    "ele.a.etap": "",
-    "ele.a.gamma": "1/m",
-    "ele.a.phi": "",
-    "ele.b.beta": "m",
-    "ele.b.alpha": "",
-    "ele.b.eta": "m",
-    "ele.b.etap": "",
-    "ele.b.gamma": "1/m",
-    "ele.b.phi": "",
-    "ele.x.eta": "m",
-    "ele.x.etap": "",
-    "ele.y.eta": "m",
-    "ele.y.etap": "",
-    "ele.s": "m",
-    "ele.l": "m",
-    "ele.e_tot": "eV",
-    "ele.p0c": "eV",
-    "ele.mat6": "",
-    "ele.vec0": "m",
+    "name": "",
+    "ix_ele": "",
+    "ix_branch": "",
+    "a.beta": "m",
+    "a.alpha": "",
+    "a.eta": "m",
+    "a.etap": "",
+    "a.gamma": "1/m",
+    "a.phi": "",
+    "b.beta": "m",
+    "b.alpha": "",
+    "b.eta": "m",
+    "b.etap": "",
+    "b.gamma": "1/m",
+    "b.phi": "",
+    "x.eta": "m",
+    "x.etap": "",
+    "y.eta": "m",
+    "y.etap": "",
+    "s": "m",
+    "l": "m",
+    "e_tot": "eV",
+    "p0c": "eV",
+    "mat6": "",
+    "vec0": "m",
 }
 
 ###############################################################
@@ -117,7 +117,7 @@ def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
     outputs = {}
     lattice_elements = tao.lat_list("*", "ele.name")
     for k in TAO_OUTPUT_UNITS.keys():
-        output = tao.lat_list("*", k)
+        output = tao.lat_list("*", "ele." + k)
         outputs.update(
             {
                 ele + k.replace("ele", ""): val
@@ -168,3 +168,35 @@ def get_particle_group_at_element(tao:Tao, element, file_name=None):
         write_bmad(P, file_name, p0c = data_bunch1["p0c"][0])
         print('Wrote Bmad beam file')
     return P
+
+
+def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
+    """
+    returns dictionary of output variables
+
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    dict[str, list[Any]]
+    a dictionary of NDVariables
+
+    """
+    elements = tao.lat_list("*", "ele.name")
+    element_count = len(elements)
+    out_dict = {}
+
+    for parameter_name in TAO_OUTPUT_UNITS.keys():
+            out_dict[parameter_name] = NDVariable(
+                name=parameter_name,
+                shape = (1, element_count),
+                unit=TAO_OUTPUT_UNITS[parameter_name],
+                read_only=True,
+            )
+    return out_dict
+
+def get_tao_output_parameters():
+    return list(TAO_OUTPUT_UNITS.keys())

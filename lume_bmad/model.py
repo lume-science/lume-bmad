@@ -8,6 +8,8 @@ from lume_bmad.utils import (
     get_tao_lat_list_outputs,
     get_beam_info,
     get_particle_group_at_element,
+    get_tao_output_parameters,
+    get_tao_output_variables
 )
 from lume_bmad.transformer import BmadTransformer
 from beamphysics.interfaces.bmad import write_bmad
@@ -56,9 +58,15 @@ class LUMEBmadModel(LUMEModel):
 
         self.tao = Tao(f"-init {init_file} -noplot")
 
+        # Add model parameters read_only_variables
+        model_output_variables = get_tao_output_variables(self.tao)
+
         # import control and output variables
         self._control_variables = control_variables
-        self._read_only_variables = output_variables
+        #self._read_only_variables = model_output_variables.update(output_variables)
+        self._read_only_variables = model_output_variables
+
+        
 
         # add both control and read-only variables to the list of model variables
         self._variables = {
@@ -140,6 +148,7 @@ class LUMEBmadModel(LUMEModel):
         """
         Update the model state by reading all supported variables.
         """
+        tao_output_parameters = get_tao_output_parameters()
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
             # handle reading the input / output beam distributions
@@ -155,6 +164,8 @@ class LUMEBmadModel(LUMEModel):
             
             elif name == "track_type":
                 self._state[name] = 1 if self.tao.tao_global()["track_type"] == "beam" else 0
+            elif name in tao_output_parameters:
+                self._state[name] = self.tao.lat_list("*", "ele." + name)
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)
