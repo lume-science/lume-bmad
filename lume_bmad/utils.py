@@ -1,7 +1,6 @@
 import yaml
 from lume.variables import ScalarVariable, NDVariable
 from typing import Any
-from lume_bmad.transformer import BmadTransformer
 from pytao import Tao
 from beamphysics.interfaces.bmad import write_bmad
 from pmd_beamphysics import ParticleGroup
@@ -10,7 +9,6 @@ from pmd_beamphysics import ParticleGroup
 
 
 TAO_OUTPUT_UNITS = {
-    "name": "",
     "ix_ele": "",
     "ix_branch": "",
     "a.beta": "m",

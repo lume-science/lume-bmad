@@ -1,4 +1,5 @@
 from os import getcwd
+import numpy as np
 from typing import Any
 from lume.model import LUMEModel
 from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
@@ -33,7 +34,7 @@ class LUMEBmadModel(LUMEModel):
 
     def __init__(
         self,
-        init_file: str,
+        tao: Tao,
         control_variables: dict[str, Variable],
         output_variables: dict[str, Variable],
         transformer: BmadTransformer,
@@ -44,8 +45,8 @@ class LUMEBmadModel(LUMEModel):
 
         Arguments
         ---------
-        init_file: str
-            Path to the Tao init file.
+        tao: Tao
+            Tao object initialized with the desired init file.
         control_variables: dict[str, Variable]
             Dictionary of control variables.
         output_variables: dict[str, Variable]
@@ -57,7 +58,7 @@ class LUMEBmadModel(LUMEModel):
 
         """
 
-        self.tao = Tao(f"-init {init_file} -noplot")
+        self.tao = tao
 
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.tao)
@@ -171,7 +172,7 @@ class LUMEBmadModel(LUMEModel):
             elif name == "track_type":
                 self._state[name] = 1 if self.tao.tao_global()["track_type"] == "beam" else 0
             elif name in tao_output_parameters:
-                self._state[name] = self.tao.lat_list("*", "ele." + name)
+                self._state[name] = np.array(self.tao.lat_list("*", "ele." + name))
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)
