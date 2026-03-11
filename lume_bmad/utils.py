@@ -1,11 +1,8 @@
-import yaml
-from lume.variables import ScalarVariable, NDVariable
+from lume.variables import NDVariable
 from typing import Any
 from pytao import Tao
 from beamphysics.interfaces.bmad import write_bmad
 from pmd_beamphysics import ParticleGroup
-
-# from lcls_live.datamaps import get_datamaps 
 
 
 TAO_OUTPUT_UNITS = {
