@@ -153,22 +153,6 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     return beam_info
 
 
-def get_particle_group_at_element(tao:Tao, element, file_name=None):
-    """
-    returns a ParticleGroup and optionally writes Bmad particles to file
-    """
-    parameters =  \
-        ["x", "px", "y", "py", "z", "pz", "p0c", "charge", "state", "t", "status"]
-    data_bunch1 = {"species": "electron"}
-    for par in parameters:
-        data_bunch1[par] = tao.bunch1(element, par)
-    P = ParticleGroup.from_bmad(data_bunch1)
-    if file_name:
-        write_bmad(P, file_name, p0c = data_bunch1["p0c"][0])
-        print('Wrote Bmad beam file')
-    return P
-
-
 def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
     """
     returns dictionary of output variables

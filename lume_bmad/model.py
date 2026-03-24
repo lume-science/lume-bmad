@@ -6,7 +6,6 @@ from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
     evaluate_tao,
-    get_particle_group_at_element,
     get_tao_output_parameters,
     get_tao_output_variables
 )
@@ -163,9 +162,7 @@ class LUMEBmadModel(LUMEModel):
                         element_name = self.end_element
                     else:
                         element_name = name.split("_beam")[0]
-                    self._state[name] = get_particle_group_at_element(
-                            self.tao, element_name
-                        )
+                    self._state[name] = self.tao.particles(element_name)
                 else:
                     self._state[name] = None
             

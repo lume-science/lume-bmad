@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "lume-base @ git+https://github.com/slaclab/lume-base@main",
-    "pytao"
+    "pytao>=1.0.0"
 ]
 
 [project.urls]
