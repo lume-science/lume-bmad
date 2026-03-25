@@ -9,6 +9,7 @@ from pmd_beamphysics import ParticleGroup
 
 
 TAO_OUTPUT_UNITS = {
+    "name":"",
     "ix_ele": "",
     "ix_branch": "",
     "a.beta": "m",
