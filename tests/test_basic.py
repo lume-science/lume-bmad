@@ -1,13 +1,12 @@
 import pytest
 import numpy as np
 
+from pytao import Tao
+
 from lume_bmad.model import LUMEBmadModel
 from lume.variables import NDVariable, ScalarVariable
 from lume_bmad.transformer import BasicTransformer
 from beamphysics import ParticleGroup
-
-from lume_bmad.utils import get_particle_group_at_element
-
 
 class TestModel:
     @pytest.fixture
@@ -17,8 +16,9 @@ class TestModel:
             "qd:B1_GRADIENT": ScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
         }
         transformer = BasicTransformer({})
+        tao = Tao(init_file="tests/fodo.init")
 
-        model = LUMEBmadModel("tests/fodo.init", control_variables, {}, transformer, dump_locations=["qf", "qd"])
+        model = LUMEBmadModel(tao, control_variables, {}, transformer, dump_locations=["qf", "qd"])
         return model
 
     def test_model_initialization(self, model):
@@ -67,7 +67,7 @@ class TestModel:
         class ScreenTransformer(BasicTransformer):
             def get_tao_property(self, tao, control_name):
                 if control_name == "qf_screen":
-                    beam = get_particle_group_at_element(tao, "qf")
+                    beam = tao.particles("qf")
                     # simple screen that counts number of particles
                     hist, _ = beam.histogramdd("x", "y", bins=(100, 100), range=((-0.1, 0.1), (-0.1, 0.1)))
                     return hist
@@ -76,7 +76,7 @@ class TestModel:
 
 
         model = LUMEBmadModel(
-            "tests/fodo.init", 
+            Tao(init_file="tests/fodo.init"), 
             control_variables,
             output_variables, 
             ScreenTransformer({}), 
