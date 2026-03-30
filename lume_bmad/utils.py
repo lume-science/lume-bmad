@@ -183,3 +183,22 @@ def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
 
 def get_tao_output_parameters():
     return list(TAO_OUTPUT_UNITS.keys())
+
+
+def rmat_get(tao, element_a, element_b, design = False):
+    """
+    Returns dictionary with Rmat from a to b
+    
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    array (6,6) containing Rmat
+
+    """
+    if design:
+        element_a = element_a + "|design"
+    return tao.matrix(element_a, element_b)['mat6']
