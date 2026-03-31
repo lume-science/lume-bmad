@@ -1,4 +1,5 @@
 from os import getcwd
+import warnings
 import numpy as np
 from typing import Any
 from lume.model import LUMEModel
@@ -126,16 +127,20 @@ class LUMEBmadModel(LUMEModel):
         """
         # handle setting track_type separately since it is not a simple Tao property
         if "track_type" in values.keys():
-            if values.pop("track_type", None) == 1:
-                self.tao.cmd("set global track_type = beam")
+            if values["track_type"] == 1:
+                output = self.tao.cmd("set global track_type = beam")
             else:
-                self.tao.cmd("set global track_type = single")
+                output = self.tao.cmd("set global track_type = single")
+
+            if len(output) > 0:
+                warnings.warn(f"Warning while setting track_type: {'\n'.join(output)}")
+            values.pop("track_type")
 
         # handle setting the input beam separately
         if "input_beam" in values.keys():
             input_beam = values.pop("input_beam")
-            fname = getcwd()+"/input_beam.particles"
-            write_bmad(input_beam, fname, p0c=input_beam["mean_p"])
+            fname = getcwd()+"/input_beam.h5"
+            input_beam.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
 
         # map pvdata to tao commands and evaluate
