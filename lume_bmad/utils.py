@@ -1,3 +1,4 @@
+import numpy as np
 import yaml
 from lume.variables import ScalarVariable, NDVariable
 from typing import Any
@@ -153,7 +154,7 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     return beam_info
 
 
-def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
+def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
     """
     returns dictionary of output variables
 
@@ -164,8 +165,8 @@ def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
 
     Returns
     -------
-    dict[str, list[Any]]
-    a dictionary of NDVariables
+    dict[str, NDVariable]
+        A dictionary of NDVariables.
 
     """
     elements = tao.lat_list("*", "ele.name")
@@ -173,12 +174,18 @@ def get_tao_output_variables(tao:Tao) ->dict[str, list[Any]]:
     out_dict = {}
 
     for parameter_name in TAO_OUTPUT_UNITS.keys():
-            out_dict[parameter_name] = NDVariable(
-                name=parameter_name,
-                shape = (1, element_count),
-                unit=TAO_OUTPUT_UNITS[parameter_name],
-                read_only=True,
-            )
+        if parameter_name in ["name"]:
+            data_type_ = np.dtype('<U12')  # string type with max length 12
+        else:
+            data_type_ = float
+
+        out_dict[parameter_name] = NDVariable(
+            name=parameter_name,
+            shape = (element_count,),
+            unit=TAO_OUTPUT_UNITS[parameter_name],
+            read_only=True,
+            dtype=data_type_,
+        )
     return out_dict
 
 def get_tao_output_parameters():
