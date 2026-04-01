@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "lume-base @ git+https://github.com/slaclab/lume-base@main",
+    "lume-base @ git+https://github.com/slaclab/lume-base",
     "pytao>=1.0.0"
 ]
 
