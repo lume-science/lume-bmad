@@ -174,7 +174,12 @@ class LUMEBmadModel(LUMEModel):
             elif name == "track_type":
                 self._state[name] = 1 if self.tao.tao_global()["track_type"] == "beam" else 0
             elif name in tao_output_parameters:
-                self._state[name] = np.array(self.tao.lat_list("*", "ele." + name))
+                lat_values = self.tao.lat_list("*", "ele." + name)
+                if name == "name":
+                    # Keep element names as object dtype to avoid fixed-width unicode dtypes.
+                    self._state[name] = np.asarray(lat_values, dtype=object)
+                else:
+                    self._state[name] = np.asarray(lat_values)
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)

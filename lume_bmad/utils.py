@@ -118,11 +118,14 @@ def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
     lattice_elements = tao.lat_list("*", "ele.name")
     for k in TAO_OUTPUT_UNITS.keys():
         output = tao.lat_list("*", "ele." + k)
-        outputs.update(
-            {
-                ele + k.replace("ele", ""): val
-                for ele, val in zip(lattice_elements, output)
-            }
+        if k == "name":
+            outputs[k] = np.asarray(output, dtype=object)
+        else:
+            outputs.update(
+                {
+                    ele + k.replace("ele", ""): val
+                    for ele, val in zip(lattice_elements, output)
+                }
         )
 
     return outputs
@@ -175,7 +178,8 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
 
     for parameter_name in TAO_OUTPUT_UNITS.keys():
         if parameter_name in ["name"]:
-            data_type_ = np.dtype('<U12')  # string type with max length 12
+            # Avoid fixed-width unicode dtypes (<U0, <U12, ...) so any name length is valid.
+            data_type_ = object
         else:
             data_type_ = float
 
