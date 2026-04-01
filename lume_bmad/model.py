@@ -133,7 +133,7 @@ class LUMEBmadModel(LUMEModel):
                 output = self.tao.cmd("set global track_type = single")
 
             if len(output) > 0:
-                warnings.warn(f"Warning while setting track_type: {'\n'.join(output)}")
+                warnings.warn(f"Warning while setting track_type: {''.join(output)}")
             values.pop("track_type")
 
         # handle setting the input beam separately
