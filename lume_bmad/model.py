@@ -197,12 +197,12 @@ class LUMEBmadModel(LUMEModel):
     @property
     def start_element(self):
         """name of element at which beam is initialized for tracking"""
-        return self.tao.beam(0)["track_start"] if self.tao.beam(0)["track_start"] != "" else "BEGINNING"
+        return self.tao.beam(0)["track_start"] if self.tao.beam(0)["track_start"] != "" else self.tao.lat_list("*", "ele.name")[0]
     
     @property
     def end_element(self):
         """name of element at which beam is tracked to"""
-        return self.tao.beam(0)["track_end"] if self.tao.beam(0)["track_end"] != "" else "END"
+        return self.tao.beam(0)["track_end"] if self.tao.beam(0)["track_end"] != "" else self.tao.lat_list("*", "ele.name")[-1]
 
     @property
     def supported_variables(self):
