@@ -86,3 +86,9 @@ class TestModel:
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
         assert qf_screen.shape == (100, 100)
+
+    def test_mat6_output(self, model):
+        # test that mat6 output variable is being read and has correct shape
+        mat6 = model.get("mat6")
+        assert isinstance(mat6, np.ndarray)
+        assert mat6.shape == (len(model.tao.lat_list("*", "ele.name")), 6, 6)
