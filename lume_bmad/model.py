@@ -7,11 +7,11 @@ from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
     evaluate_tao,
-    get_tao_output_parameters,
-    get_tao_output_variables
+    get_tao_output_variables,
+    TAO_OUTPUT_UNITS, 
+    TAO_COMB_OUTPUT_UNITS,
 )
 from lume_bmad.transformer import BmadTransformer
-from beamphysics.interfaces.bmad import write_bmad
 
 class LUMEBmadModel(LUMEModel):
     """
@@ -39,6 +39,7 @@ class LUMEBmadModel(LUMEModel):
         output_variables: dict[str, Variable],
         transformer: BmadTransformer,
         dump_locations: list[str] = [],
+        comb_ds_save: float = 0.1,
     ):
         """
         Initialize the Bmad model.
@@ -55,10 +56,13 @@ class LUMEBmadModel(LUMEModel):
             Transformer object for mapping between control variable names and Bmad element names + attributes.
         dump_locations: list[str], optional
             List of element names at which to dump the beam distribution in addition to the start and end of the lattice.
+        comb_ds_save: float, optional
+            Length frequency of dumping tracked beam parameters for tao comb command. Default is 0.1 m.
 
         """
 
         self.tao = tao
+        self.comb_ds_save = comb_ds_save
 
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.tao)
@@ -128,9 +132,27 @@ class LUMEBmadModel(LUMEModel):
         # handle setting track_type separately since it is not a simple Tao property
         if "track_type" in values.keys():
             if values["track_type"] == 1:
+                if self.tao.beam_init(0)["n_particle"] == 0:
+                    raise ValueError(
+                        "Cannot set track_type to beam when no beam is initialized in Tao. " \
+                        "Please set a beam using the input_beam variable or initialize a " \
+                        "beam in Tao before setting track_type to beam."
+                    )
+
                 output = self.tao.cmd("set global track_type = beam")
+
+                # set comb length for tracking outputs
+                self.tao.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
+                tao_model_output_variables = get_tao_output_variables(self.tao)
+                self._variables.update(tao_model_output_variables)
+
             else:
                 output = self.tao.cmd("set global track_type = single")
+
+                # remove comb output variables when switching back to single particle tracking
+                for var in TAO_COMB_OUTPUT_UNITS.keys():
+                    if var in self._variables.keys():
+                        self._variables.pop(var)
 
             if len(output) > 0:
                 warnings.warn(f"Warning while setting track_type: {''.join(output)}")
@@ -154,7 +176,7 @@ class LUMEBmadModel(LUMEModel):
         """
         Update the model state by reading all supported variables.
         """
-        tao_output_parameters = get_tao_output_parameters()
+
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
             # handle reading the input / output beam distributions
@@ -173,19 +195,28 @@ class LUMEBmadModel(LUMEModel):
             
             elif name == "track_type":
                 self._state[name] = 1 if self.tao.tao_global()["track_type"] == "beam" else 0
-            elif name in tao_output_parameters:
+            
+            elif name in TAO_OUTPUT_UNITS.keys():
                 lat_values = self.tao.lat_list("*", "ele." + name)
                 if name == "name":
                     # Keep element names as object dtype to avoid fixed-width unicode dtypes.
                     self._state[name] = np.asarray(lat_values, dtype=object)
-                elif name in "mat6":
+                elif name == "mat6":
                     # reshape mat6 output to be (element_count, 6, 6)
                     self._state[name] = np.asarray(lat_values).reshape(-1, 6, 6)
-                elif name in "vec0":
+                elif name == "vec0":
                     # reshape vec0 output to be (element_count, 6)
                     self._state[name] = np.asarray(lat_values).reshape(-1, 6)
                 else:
                     self._state[name] = np.asarray(lat_values)
+            
+            elif name in TAO_COMB_OUTPUT_UNITS.keys():
+                # for comb outputs, get the value from the tao bunch_comb command
+                if self.tao.tao_global()["track_type"] == "beam":
+                    self._state[name] = np.asarray(self.tao.bunch_comb(name))
+                else:
+                    self._state[name] = None
+            
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)
