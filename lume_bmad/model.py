@@ -132,13 +132,6 @@ class LUMEBmadModel(LUMEModel):
         # handle setting track_type separately since it is not a simple Tao property
         if "track_type" in values.keys():
             if values["track_type"] == 1:
-                if self.tao.beam_init(0)["n_particle"] == 0:
-                    raise ValueError(
-                        "Cannot set track_type to beam when no beam is initialized in Tao. " \
-                        "Please set a beam using the input_beam variable or initialize a " \
-                        "beam in Tao before setting track_type to beam."
-                    )
-
                 output = self.tao.cmd("set global track_type = beam")
 
                 # set comb length for tracking outputs

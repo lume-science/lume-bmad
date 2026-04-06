@@ -214,3 +214,4 @@ __marimo__/
 
 .vscode/
 *_version.py
+*.svg
