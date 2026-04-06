@@ -3,8 +3,6 @@ import yaml
 from lume.variables import ScalarVariable, NDVariable
 from typing import Any
 from pytao import Tao
-from beamphysics.interfaces.bmad import write_bmad
-from pmd_beamphysics import ParticleGroup
 
 # from lcls_live.datamaps import get_datamaps 
 
@@ -25,16 +23,32 @@ TAO_OUTPUT_UNITS = {
     "b.etap": "",
     "b.gamma": "1/m",
     "b.phi": "",
-    "x.eta": "m",
-    "x.etap": "",
-    "y.eta": "m",
-    "y.etap": "",
-    "s": "m",
     "l": "m",
     "e_tot": "eV",
     "p0c": "eV",
     "mat6": "",
     "vec0": "m",
+}
+
+TAO_COMB_OUTPUT_UNITS = {
+    "s": "m",
+    "x": "m",
+    "px": "rad",
+    "y": "m",
+    "py": "rad",
+    "t": "s",
+    "x.beta": "m",
+    "x.alpha": "",
+    "x.eta": "m",
+    "x.etap": "",
+    "x.emit": "m*rad",
+    "x.norm_emit": "m*rad",
+    "y.beta": "m",
+    "y.alpha": "",
+    "y.eta": "m",
+    "y.etap": "",
+    "y.emit": "m*rad",
+    "y.norm_emit": "m*rad",
 }
 
 ###############################################################
@@ -176,6 +190,7 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
     element_count = len(elements)
     out_dict = {}
 
+    # handle lat_list outputs first
     for parameter_name in TAO_OUTPUT_UNITS.keys():
         if parameter_name in ["name"]:
             # Avoid fixed-width unicode dtypes (<U0, <U12, ...) so any name length is valid.
@@ -198,10 +213,21 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
             read_only=True,
             dtype=data_type_,
         )
-    return out_dict
 
-def get_tao_output_parameters():
-    return list(TAO_OUTPUT_UNITS.keys())
+    # handle comb outputs
+    if tao.tao_global()["track_type"] == "beam":
+        s = tao.bunch_comb('s')
+        shape = s.shape
+        for parameter_name in TAO_COMB_OUTPUT_UNITS.keys():
+            out_dict[parameter_name] = NDVariable(
+                name=parameter_name,
+                shape=shape,
+                unit=TAO_COMB_OUTPUT_UNITS[parameter_name],
+                read_only=True,
+                dtype=float,
+            )
+
+    return out_dict
 
 
 def rmat_get(tao, element_a, element_b, design = False):

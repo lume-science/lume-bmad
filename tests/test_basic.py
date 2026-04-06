@@ -4,6 +4,7 @@ import numpy as np
 from pytao import Tao
 
 from lume_bmad.model import LUMEBmadModel
+from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
 from lume.variables import NDVariable, ScalarVariable
 from lume_bmad.transformer import BasicTransformer
 from beamphysics import ParticleGroup
@@ -147,3 +148,31 @@ class TestModel:
         assert isinstance(names, np.ndarray)
         assert names.dtype == object
         assert len(names) == len(model.tao.lat_list("*", "ele.name"))
+
+    def test_comb_ds_save_setting(self, model):
+        supported = model.supported_variables
+        expected = {
+            "qf:B1_GRADIENT",
+            "qd:B1_GRADIENT",
+            "input_beam",
+            "output_beam",
+            "qf_beam",
+            "qd_beam",
+            "track_type",
+            "name",
+            "mat6",
+            "vec0",
+        }
+        assert expected.issubset(set(supported.keys()))
+
+        # setting track_type to beam should add to the list of expected pvs
+        model.set({"track_type": 1})
+        supported = model.supported_variables
+        expected.update(set(TAO_COMB_OUTPUT_UNITS.keys()))
+        assert expected.issubset(set(supported.keys()))
+
+        # setting track_type back to single should remove comb output variables
+        model.set({"track_type": 0})
+        supported = model.supported_variables
+        expected.difference_update(set(TAO_COMB_OUTPUT_UNITS.keys()))
+        assert expected.issubset(set(supported.keys()))
