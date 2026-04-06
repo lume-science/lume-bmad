@@ -25,7 +25,8 @@ classifiers = [
 ]
 dependencies = [
     "lume-base @ git+https://github.com/slaclab/lume-base",
-    "pytao>=1.0.0"
+    "pytao>=1.0.0",
+    "openpmd-beamphysics",
 ]
 
 [project.urls]
