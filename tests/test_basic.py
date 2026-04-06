@@ -171,8 +171,17 @@ class TestModel:
         expected.update(set(TAO_COMB_OUTPUT_UNITS.keys()))
         assert expected.issubset(set(supported.keys()))
 
+        # try to get a comb output variable before setting comb_ds_save and check that it is empty
+        comb_output = model.get("s")
+        assert isinstance(comb_output, np.ndarray)
+        assert len(comb_output) == 23
+
         # setting track_type back to single should remove comb output variables
         model.set({"track_type": 0})
         supported = model.supported_variables
         expected.difference_update(set(TAO_COMB_OUTPUT_UNITS.keys()))
         assert expected.issubset(set(supported.keys()))
+
+        # try to get a comb output -- should raise error since they should no longer be supported
+        with pytest.raises(ValueError):
+            model.get("s")
