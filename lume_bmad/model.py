@@ -178,6 +178,12 @@ class LUMEBmadModel(LUMEModel):
                 if name == "name":
                     # Keep element names as object dtype to avoid fixed-width unicode dtypes.
                     self._state[name] = np.asarray(lat_values, dtype=object)
+                elif name in "mat6":
+                    # reshape mat6 output to be (element_count, 6, 6)
+                    self._state[name] = np.asarray(lat_values).reshape(-1, 6, 6)
+                elif name in "vec0":
+                    # reshape vec0 output to be (element_count, 6)
+                    self._state[name] = np.asarray(lat_values).reshape(-1, 6)
                 else:
                     self._state[name] = np.asarray(lat_values)
             else:

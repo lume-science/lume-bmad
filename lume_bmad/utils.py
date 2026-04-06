@@ -183,9 +183,17 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
         else:
             data_type_ = float
 
+        if parameter_name == "mat6":
+            shape = (element_count, 6, 6)
+        elif parameter_name == "vec0":
+            shape = (element_count, 6)
+        else:
+            shape = (element_count,)
+
+
         out_dict[parameter_name] = NDVariable(
             name=parameter_name,
-            shape = (element_count,),
+            shape = shape,
             unit=TAO_OUTPUT_UNITS[parameter_name],
             read_only=True,
             dtype=data_type_,
