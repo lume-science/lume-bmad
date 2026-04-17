@@ -49,6 +49,7 @@ TAO_COMB_OUTPUT_UNITS = {
     "y.etap": "",
     "y.emit": "m*rad",
     "y.norm_emit": "m*rad",
+    "n_particle_live": "",
 }
 
 ###############################################################

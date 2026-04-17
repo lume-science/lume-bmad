@@ -158,6 +158,11 @@ class LUMEBmadModel(LUMEModel):
             input_beam.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
 
+            # reset comb length for tracking outputs
+            self.tao.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
+            tao_model_output_variables = get_tao_output_variables(self.tao)
+            self._variables.update(tao_model_output_variables)
+
         # map pvdata to tao commands and evaluate
         tao_cmds = self.transformer.get_tao_commands(self.tao, values)
         evaluate_tao(self.tao, tao_cmds)
