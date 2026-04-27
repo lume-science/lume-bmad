@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
-
+import os
+from pathlib import Path
 from pytao import Tao
 
 from lume_bmad.model import LUMEBmadModel
@@ -8,6 +9,8 @@ from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
 from lume.variables import NDVariable, ScalarVariable
 from lume_bmad.transformer import BasicTransformer
 from beamphysics import ParticleGroup
+
+TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
 
 class TestModel:
     @pytest.fixture
@@ -185,3 +188,12 @@ class TestModel:
         # try to get a comb output -- should raise error since they should no longer be supported
         with pytest.raises(ValueError):
             model.get("x.beta")
+
+        # adding an initial beam should update the length of the comb output variables
+        model.set({"input_beam": ParticleGroup(TEST_BEAM_PATH)})
+        model.set({"track_type": 1})
+
+        comb_output = model.get("x.beta")
+        assert isinstance(comb_output, np.ndarray)
+        assert len(comb_output) == 23
+
