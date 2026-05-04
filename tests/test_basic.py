@@ -197,3 +197,18 @@ class TestModel:
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 
+    def test_getting_all_variables(self, model):
+        variable_names = list(model.supported_variables.keys())
+
+        # before model is run, beam variables should not be supported
+        # remove beam variables from expected list
+        for name in ["input_beam", "output_beam", "qf_beam", "qd_beam"]:
+            variable_names.remove(name)
+
+        for name in variable_names:
+            model.get(name)
+
+        # run the model in beam tracking mode and then try to get all variables again, including beam variables
+        model.set({"track_type": 1})
+        for name in model.supported_variables.keys():
+            model.get(name)
