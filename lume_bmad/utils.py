@@ -196,6 +196,8 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
         if parameter_name in ["name"]:
             # Avoid fixed-width unicode dtypes (<U0, <U12, ...) so any name length is valid.
             data_type_ = object
+        elif parameter_name in ["ix_ele"]:
+            data_type_ = np.int32
         else:
             data_type_ = float
 
