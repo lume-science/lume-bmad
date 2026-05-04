@@ -75,9 +75,6 @@ class LUMEBmadModel(LUMEModel):
         self._variables = {
             **self._control_variables, 
             **self._read_only_variables,
-            "input_beam": ParticleGroupVariable(name="input_beam"),
-            "output_beam": ParticleGroupVariable(name="output_beam", read_only=True),
-            **{f"{ele}_beam": ParticleGroupVariable(name=f"{ele}_beam", read_only=True) for ele in dump_locations}
         }
 
         # add track_type variable to control variables to allow toggling between single particle and beam tracking
@@ -139,11 +136,23 @@ class LUMEBmadModel(LUMEModel):
                 tao_model_output_variables = get_tao_output_variables(self.tao)
                 self._variables.update(tao_model_output_variables)
 
+                # set particle group variables
+                self._variables.update(
+                    {"input_beam": ParticleGroupVariable(name="input_beam"),
+                    "output_beam": ParticleGroupVariable(name="output_beam", read_only=True),
+                    **{f"{ele}_beam": ParticleGroupVariable(name=f"{ele}_beam", read_only=True) for ele in self._dump_locations},
+                })
+
             else:
                 output = self.tao.cmd("set global track_type = single")
 
                 # remove comb output variables when switching back to single particle tracking
                 for var in TAO_COMB_OUTPUT_UNITS.keys():
+                    if var in self._variables.keys():
+                        self._variables.pop(var)
+
+                # remove particle group variables
+                for var in ["input_beam", "output_beam"] + [f"{ele}_beam" for ele in self._dump_locations]:
                     if var in self._variables.keys():
                         self._variables.pop(var)
 

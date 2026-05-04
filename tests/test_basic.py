@@ -200,11 +200,6 @@ class TestModel:
     def test_getting_all_variables(self, model):
         variable_names = list(model.supported_variables.keys())
 
-        # before model is run, beam variables should not be supported
-        # remove beam variables from expected list
-        for name in ["input_beam", "output_beam", "qf_beam", "qd_beam"]:
-            variable_names.remove(name)
-
         for name in variable_names:
             model.get(name)
 
