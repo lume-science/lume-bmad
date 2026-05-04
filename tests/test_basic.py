@@ -12,6 +12,7 @@ from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
 
+
 class TestModel:
     @pytest.fixture
     def model(self):
@@ -22,7 +23,9 @@ class TestModel:
         transformer = BasicTransformer({})
         tao = Tao(init_file="tests/fodo.init", noplot=True)
 
-        model = LUMEBmadModel(tao, control_variables, {}, transformer, dump_locations=["qf", "qd"])
+        model = LUMEBmadModel(
+            tao, control_variables, {}, transformer, dump_locations=["qf", "qd"]
+        )
         return model
 
     def test_model_initialization(self, model):
@@ -75,18 +78,19 @@ class TestModel:
                         return np.zeros((100, 100))
                     beam = tao.particles("qf")
                     # simple screen that counts number of particles
-                    hist, _ = beam.histogramdd("x", "y", bins=(100, 100), range=((-0.1, 0.1), (-0.1, 0.1)))
+                    hist, _ = beam.histogramdd(
+                        "x", "y", bins=(100, 100), range=((-0.1, 0.1), (-0.1, 0.1))
+                    )
                     return hist
                 else:
                     return super().get_tao_property(tao, control_name)
 
-
         model = LUMEBmadModel(
-            Tao(init_file="tests/fodo.init", noplot=True), 
+            Tao(init_file="tests/fodo.init", noplot=True),
             control_variables,
-            output_variables, 
-            ScreenTransformer({}), 
-            dump_locations=["qf", "qd"]
+            output_variables,
+            ScreenTransformer({}),
+            dump_locations=["qf", "qd"],
         )
         model.set({"track_type": 1})
         qf_screen = model.get(["qf_screen"])["qf_screen"]
@@ -108,7 +112,9 @@ class TestModel:
     def test_track_type_toggle_updates_beam_state(self, model):
         # start in beam tracking mode and verify beam outputs are populated
         model.set({"track_type": 1})
-        tracked = model.get(["track_type", "input_beam", "output_beam", "qf_beam", "qd_beam"])
+        tracked = model.get(
+            ["track_type", "input_beam", "output_beam", "qf_beam", "qd_beam"]
+        )
         assert tracked["track_type"] == 1
         assert isinstance(tracked["input_beam"], ParticleGroup)
         assert isinstance(tracked["output_beam"], ParticleGroup)

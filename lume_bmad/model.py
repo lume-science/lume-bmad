@@ -8,10 +8,11 @@ from pytao import Tao
 from lume_bmad.utils import (
     evaluate_tao,
     get_tao_output_variables,
-    TAO_OUTPUT_UNITS, 
+    TAO_OUTPUT_UNITS,
     TAO_COMB_OUTPUT_UNITS,
 )
 from lume_bmad.transformer import BmadTransformer
+
 
 class LUMEBmadModel(LUMEModel):
     """
@@ -70,24 +71,22 @@ class LUMEBmadModel(LUMEModel):
         # import control and output variables
         self._control_variables = control_variables
         self._read_only_variables = model_output_variables | output_variables
-        
+
         # add both control and read-only variables to the list of model variables
         self._variables = {
-            **self._control_variables, 
+            **self._control_variables,
             **self._read_only_variables,
         }
 
         # add track_type variable to control variables to allow toggling between single particle and beam tracking
-        self._variables.update(
-            {"track_type": ScalarVariable(name="track_type")}
-        )
+        self._variables.update({"track_type": ScalarVariable(name="track_type")})
 
         # create transformer for mapping between control names and bmad names
         self.transformer = transformer
 
         # set dumping of beam distributions at the beginning and end of the lattice
         self._dump_locations = dump_locations
-        elements = ",".join(dump_locations + ["BEGINNING", "END"]) 
+        elements = ",".join(dump_locations + ["BEGINNING", "END"])
         self.tao.cmd(f"set beam saved_at = {elements}")
 
         # get initial state of the model
@@ -138,10 +137,19 @@ class LUMEBmadModel(LUMEModel):
 
                 # set particle group variables
                 self._variables.update(
-                    {"input_beam": ParticleGroupVariable(name="input_beam"),
-                    "output_beam": ParticleGroupVariable(name="output_beam", read_only=True),
-                    **{f"{ele}_beam": ParticleGroupVariable(name=f"{ele}_beam", read_only=True) for ele in self._dump_locations},
-                })
+                    {
+                        "input_beam": ParticleGroupVariable(name="input_beam"),
+                        "output_beam": ParticleGroupVariable(
+                            name="output_beam", read_only=True
+                        ),
+                        **{
+                            f"{ele}_beam": ParticleGroupVariable(
+                                name=f"{ele}_beam", read_only=True
+                            )
+                            for ele in self._dump_locations
+                        },
+                    }
+                )
 
             else:
                 output = self.tao.cmd("set global track_type = single")
@@ -152,7 +160,9 @@ class LUMEBmadModel(LUMEModel):
                         self._variables.pop(var)
 
                 # remove particle group variables
-                for var in ["input_beam", "output_beam"] + [f"{ele}_beam" for ele in self._dump_locations]:
+                for var in ["input_beam", "output_beam"] + [
+                    f"{ele}_beam" for ele in self._dump_locations
+                ]:
                     if var in self._variables.keys():
                         self._variables.pop(var)
 
@@ -163,7 +173,7 @@ class LUMEBmadModel(LUMEModel):
         # handle setting the input beam separately
         if "input_beam" in values.keys():
             input_beam = values.pop("input_beam")
-            fname = getcwd()+"/input_beam.h5"
+            fname = getcwd() + "/input_beam.h5"
             input_beam.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
 
@@ -187,7 +197,9 @@ class LUMEBmadModel(LUMEModel):
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
             # handle reading the input / output beam distributions
-            if name in ["input_beam", "output_beam"] + [f"{ele}_beam" for ele in self._dump_locations]:
+            if name in ["input_beam", "output_beam"] + [
+                f"{ele}_beam" for ele in self._dump_locations
+            ]:
                 if self.tao.tao_global()["track_type"] == "beam":
                     # get element at track start
                     if name == "input_beam":
@@ -199,10 +211,12 @@ class LUMEBmadModel(LUMEModel):
                     self._state[name] = self.tao.particles(element_name)
                 else:
                     self._state[name] = None
-            
+
             elif name == "track_type":
-                self._state[name] = 1 if self.tao.tao_global()["track_type"] == "beam" else 0
-            
+                self._state[name] = (
+                    1 if self.tao.tao_global()["track_type"] == "beam" else 0
+                )
+
             elif name in TAO_OUTPUT_UNITS.keys():
                 lat_values = self.tao.lat_list("*", "ele." + name)
                 if name == "name":
@@ -216,14 +230,14 @@ class LUMEBmadModel(LUMEModel):
                     self._state[name] = np.asarray(lat_values).reshape(-1, 6)
                 else:
                     self._state[name] = np.asarray(lat_values)
-            
+
             elif name in TAO_COMB_OUTPUT_UNITS.keys():
                 # for comb outputs, get the value from the tao bunch_comb command
                 if self.tao.tao_global()["track_type"] == "beam":
                     self._state[name] = np.asarray(self.tao.bunch_comb(name))
                 else:
                     self._state[name] = None
-            
+
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)
@@ -242,16 +256,24 @@ class LUMEBmadModel(LUMEModel):
     def read_only_variables(self):
         """dictionary of read-only output variables"""
         return self._read_only_variables
-    
+
     @property
     def start_element(self):
         """name of element at which beam is initialized for tracking"""
-        return self.tao.beam(0)["track_start"] if self.tao.beam(0)["track_start"] != "" else self.tao.lat_list("*", "ele.name")[0]
-    
+        return (
+            self.tao.beam(0)["track_start"]
+            if self.tao.beam(0)["track_start"] != ""
+            else self.tao.lat_list("*", "ele.name")[0]
+        )
+
     @property
     def end_element(self):
         """name of element at which beam is tracked to"""
-        return self.tao.beam(0)["track_end"] if self.tao.beam(0)["track_end"] != "" else self.tao.lat_list("*", "ele.name")[-1]
+        return (
+            self.tao.beam(0)["track_end"]
+            if self.tao.beam(0)["track_end"] != ""
+            else self.tao.lat_list("*", "ele.name")[-1]
+        )
 
     @property
     def supported_variables(self):

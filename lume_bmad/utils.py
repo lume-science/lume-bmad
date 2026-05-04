@@ -4,7 +4,7 @@ from lume.variables import ScalarVariable, NDVariable
 from typing import Any
 from pytao import Tao
 
-# from lcls_live.datamaps import get_datamaps 
+# from lcls_live.datamaps import get_datamaps
 
 
 TAO_OUTPUT_UNITS = {
@@ -55,6 +55,7 @@ TAO_COMB_OUTPUT_UNITS = {
 ###############################################################
 # Utility functions for importing control and output variables
 ################################################################
+
 
 def import_output_variables(output_variable_file: str):
     """
@@ -141,7 +142,7 @@ def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
                     ele + k.replace("ele", ""): val
                     for ele, val in zip(lattice_elements, output)
                 }
-        )
+            )
 
     return outputs
 
@@ -149,7 +150,7 @@ def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
 def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     """
     Returns dictionary of beam tracking information
-    
+
     Parameters
     ----------
     tao: Tao
@@ -162,17 +163,17 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
 
     """
     beam_info = {}
-    lines = tao.cmd('python show beam')
-    track_type = [l.split('=') for l in lines if "global%track_type" in l][0][1]
-    beam_info['track_type'] =  track_type[2:-1]
-    saved_at = [l.split('=') for l in lines if "saved_at" in l][0][1]
-    saved_at = saved_at.strip(' "').split(',')
-    beam_info['saved_at'] = [s.strip(' ') for s in saved_at]
+    lines = tao.cmd("python show beam")
+    track_type = [l.split("=") for l in lines if "global%track_type" in l][0][1]
+    beam_info["track_type"] = track_type[2:-1]
+    saved_at = [l.split("=") for l in lines if "saved_at" in l][0][1]
+    saved_at = saved_at.strip(' "').split(",")
+    beam_info["saved_at"] = [s.strip(" ") for s in saved_at]
 
     return beam_info
 
 
-def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
+def get_tao_output_variables(tao: Tao) -> dict[str, NDVariable]:
     """
     returns dictionary of output variables
 
@@ -208,10 +209,9 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
         else:
             shape = (element_count,)
 
-
         out_dict[parameter_name] = NDVariable(
             name=parameter_name,
-            shape = shape,
+            shape=shape,
             unit=TAO_OUTPUT_UNITS[parameter_name],
             read_only=True,
             dtype=data_type_,
@@ -219,7 +219,7 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
 
     # handle comb outputs
     if tao.tao_global()["track_type"] == "beam":
-        s = tao.bunch_comb('s')
+        s = tao.bunch_comb("s")
         shape = s.shape
         for parameter_name in TAO_COMB_OUTPUT_UNITS.keys():
             out_dict[parameter_name] = NDVariable(
@@ -233,10 +233,10 @@ def get_tao_output_variables(tao:Tao) ->dict[str, NDVariable]:
     return out_dict
 
 
-def rmat_get(tao, element_a, element_b, design = False):
+def rmat_get(tao, element_a, element_b, design=False):
     """
     Returns dictionary with Rmat from a to b
-    
+
     Parameters
     ----------
     tao: Tao
@@ -249,4 +249,4 @@ def rmat_get(tao, element_a, element_b, design = False):
     """
     if design:
         element_a = element_a + "|design"
-    return tao.matrix(element_a, element_b)['mat6']
+    return tao.matrix(element_a, element_b)["mat6"]
