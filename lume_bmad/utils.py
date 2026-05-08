@@ -164,9 +164,11 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     """
     beam_info = {}
     lines = tao.cmd("python show beam")
-    track_type = [l.split("=") for l in lines if "global%track_type" in l][0][1]
+    track_type = [line.split("=") for line in lines if "global%track_type" in line][0][
+        1
+    ]
     beam_info["track_type"] = track_type[2:-1]
-    saved_at = [l.split("=") for l in lines if "saved_at" in l][0][1]
+    saved_at = [line.split("=") for line in lines if "saved_at" in line][0][1]
     saved_at = saved_at.strip(' "').split(",")
     beam_info["saved_at"] = [s.strip(" ") for s in saved_at]
 

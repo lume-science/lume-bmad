@@ -43,21 +43,21 @@ class TestModel:
         # set track_type to 1 to enable tracking
         model.set({"track_type": 1})
 
-        output_beam = model.get(["output_beam"])["output_beam"]
+        output_beam = model.final_particles
         assert isinstance(output_beam, ParticleGroup)
         assert output_beam.n_particle == 1000
 
         # set the input beam element name and set the input beam
         model.input_beam_element_name = "qf"
-        model.set({"input_beam": output_beam})
+        model.initial_particles = output_beam.copy()
 
         # read the input beam back and check that it is the same as the output beam
-        input_beam = model.get(["input_beam"])["input_beam"]
+        input_beam = model.initial_particles
         assert input_beam == output_beam
 
         # test that beam is being dumped at the correct locations
         for ele in ["qf", "qd"]:
-            beam = model.get([f"{ele}_beam"])[f"{ele}_beam"]
+            beam = model.get(f"{ele}_beam")
             assert isinstance(beam, ParticleGroup)
             assert beam.n_particle == 1000
 
@@ -112,39 +112,28 @@ class TestModel:
     def test_track_type_toggle_updates_beam_state(self, model):
         # start in beam tracking mode and verify beam outputs are populated
         model.set({"track_type": 1})
-        tracked = model.get(
-            ["track_type", "input_beam", "output_beam", "qf_beam", "qd_beam"]
-        )
+        tracked = model.get(["track_type", "qf_beam", "qd_beam"])
         assert tracked["track_type"] == 1
-        assert isinstance(tracked["input_beam"], ParticleGroup)
-        assert isinstance(tracked["output_beam"], ParticleGroup)
         assert isinstance(tracked["qf_beam"], ParticleGroup)
         assert isinstance(tracked["qd_beam"], ParticleGroup)
 
         # switching back to single-particle mode should clear beam dumps
         model.set({"track_type": 0})
-        assert model.get(["track_type"])["track_type"] == 0
+        assert model.get("track_type") == 0
 
-        # In single mode update_state sets beam objects to None. Public get() currently
-        # validates ParticleGroupVariable types, so use _get to inspect stored state.
-        single_state = model._get(["input_beam", "output_beam", "qf_beam", "qd_beam"])
-        assert single_state["input_beam"] is None
-        assert single_state["output_beam"] is None
-        assert single_state["qf_beam"] is None
-        assert single_state["qd_beam"] is None
+        # In single mode update_state removes the beam dumps from the list of supported variables
+        for var in ["qf_beam", "qd_beam"]:
+            with pytest.raises(ValueError):
+                model.get(var)
 
-        with pytest.raises(TypeError):
-            model.get(["input_beam"])
+        assert model.initial_particles is None
+        assert model.final_particles is None
 
     def test_supported_variables_contains_model_interfaces(self, model):
         supported = model.supported_variables
         expected = {
             "qf:B1_GRADIENT",
             "qd:B1_GRADIENT",
-            "input_beam",
-            "output_beam",
-            "qf_beam",
-            "qd_beam",
             "track_type",
             "name",
             "mat6",
@@ -163,10 +152,6 @@ class TestModel:
         expected = {
             "qf:B1_GRADIENT",
             "qd:B1_GRADIENT",
-            "input_beam",
-            "output_beam",
-            "qf_beam",
-            "qd_beam",
             "track_type",
             "name",
             "mat6",
@@ -196,8 +181,8 @@ class TestModel:
             model.get("x.beta")
 
         # adding an initial beam should update the length of the comb output variables
-        model.set({"input_beam": ParticleGroup(TEST_BEAM_PATH)})
         model.set({"track_type": 1})
+        model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
 
         comb_output = model.get("x.beta")
         assert isinstance(comb_output, np.ndarray)

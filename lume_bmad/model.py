@@ -1,8 +1,10 @@
 from os import getcwd
 import warnings
+from beamphysics import ParticleGroup
 import numpy as np
 from typing import Any
 from lume.model import LUMEModel
+from lume.staged_model import InitialParticlesMixIn, FinalParticlesMixIn
 from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
@@ -14,7 +16,7 @@ from lume_bmad.utils import (
 from lume_bmad.transformer import BmadTransformer
 
 
-class LUMEBmadModel(LUMEModel):
+class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
     """
     Subclasses LUMEModel to create a Bmad model given a tao init file.
 
@@ -138,16 +140,10 @@ class LUMEBmadModel(LUMEModel):
                 # set particle group variables
                 self._variables.update(
                     {
-                        "input_beam": ParticleGroupVariable(name="input_beam"),
-                        "output_beam": ParticleGroupVariable(
-                            name="output_beam", read_only=True
-                        ),
-                        **{
-                            f"{ele}_beam": ParticleGroupVariable(
-                                name=f"{ele}_beam", read_only=True
-                            )
-                            for ele in self._dump_locations
-                        },
+                        f"{ele}_beam": ParticleGroupVariable(
+                            name=f"{ele}_beam", read_only=True
+                        )
+                        for ele in self._dump_locations
                     }
                 )
 
@@ -160,9 +156,7 @@ class LUMEBmadModel(LUMEModel):
                         self._variables.pop(var)
 
                 # remove particle group variables
-                for var in ["input_beam", "output_beam"] + [
-                    f"{ele}_beam" for ele in self._dump_locations
-                ]:
+                for var in [f"{ele}_beam" for ele in self._dump_locations]:
                     if var in self._variables.keys():
                         self._variables.pop(var)
 
@@ -197,26 +191,20 @@ class LUMEBmadModel(LUMEModel):
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
             # handle reading the input / output beam distributions
-            if name in ["input_beam", "output_beam"] + [
-                f"{ele}_beam" for ele in self._dump_locations
-            ]:
+            if name in [f"{ele}_beam" for ele in self._dump_locations]:
                 if self.tao.tao_global()["track_type"] == "beam":
-                    # get element at track start
-                    if name == "input_beam":
-                        element_name = self.start_element
-                    elif name == "output_beam":
-                        element_name = self.end_element
-                    else:
-                        element_name = name.split("_beam")[0]
+                    element_name = name.split("_beam")[0]
                     self._state[name] = self.tao.particles(element_name)
                 else:
                     self._state[name] = None
 
+            # handle reading the track_type variable
             elif name == "track_type":
                 self._state[name] = (
                     1 if self.tao.tao_global()["track_type"] == "beam" else 0
                 )
 
+            # handle reading all of the per-element tao tracking outputs
             elif name in TAO_OUTPUT_UNITS.keys():
                 lat_values = self.tao.lat_list("*", "ele." + name)
                 if name == "name":
@@ -231,6 +219,7 @@ class LUMEBmadModel(LUMEModel):
                 else:
                     self._state[name] = np.asarray(lat_values)
 
+            # handle reading the tao comb outputs for beam tracking
             elif name in TAO_COMB_OUTPUT_UNITS.keys():
                 # for comb outputs, get the value from the tao bunch_comb command
                 if self.tao.tao_global()["track_type"] == "beam":
@@ -274,6 +263,34 @@ class LUMEBmadModel(LUMEModel):
             if self.tao.beam(0)["track_end"] != ""
             else self.tao.lat_list("*", "ele.name")[-1]
         )
+
+    @property
+    def initial_particles(self) -> ParticleGroup:
+        """initial particle distribution for tracking"""
+        if self.tao.tao_global()["track_type"] == "beam":
+            return self.tao.particles(self.start_element)
+        else:
+            return None
+
+    @initial_particles.setter
+    def initial_particles(self, particles: ParticleGroup):
+        """set the initial particle distribution for tracking"""
+        if self.tao.tao_global()["track_type"] == "beam":
+            fname = getcwd() + "/input_beam.h5"
+            particles.write(fname)
+            self.tao.cmd(f"set beam_init position_file = {fname}")
+        else:
+            raise ValueError(
+                "Cannot set initial_particles when track_type is not 'beam'"
+            )
+
+    @property
+    def final_particles(self) -> ParticleGroup:
+        """final particle distribution after tracking"""
+        if self.tao.tao_global()["track_type"] == "beam":
+            return self.tao.particles(self.end_element)
+        else:
+            return None
 
     @property
     def supported_variables(self):
