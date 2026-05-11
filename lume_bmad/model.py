@@ -1,4 +1,5 @@
 from os import getcwd
+import logging
 import warnings
 from beamphysics import ParticleGroup
 import numpy as np
@@ -14,6 +15,9 @@ from lume_bmad.utils import (
     TAO_COMB_OUTPUT_UNITS,
 )
 from lume_bmad.transformer import BmadTransformer
+
+
+logger = logging.getLogger(__name__)
 
 
 class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
@@ -66,6 +70,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         self.tao = tao
         self.comb_ds_save = comb_ds_save
+        logger.debug("Initializing LUMEBmadModel with comb_ds_save=%s", comb_ds_save)
 
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.tao)
@@ -96,6 +101,12 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         self.update_state()
 
         self._initial_state = self._state.copy()
+        logger.info(
+            "Initialized LUMEBmadModel with %d control vars, %d read-only vars, %d total vars",
+            len(self._control_variables),
+            len(self._read_only_variables),
+            len(self._variables),
+        )
 
     def _get(self, names: list[str]) -> dict[str, Any]:
         """
@@ -127,9 +138,12 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         values : dict[str, Any]
             Dictionary of variable names and values to set
         """
+        logger.debug("_set called with keys: %s", list(values.keys()))
+
         # handle setting track_type separately since it is not a simple Tao property
         if "track_type" in values.keys():
             if values["track_type"] == 1:
+                logger.debug("Switching Tao track_type to beam")
                 output = self.tao.cmd("set global track_type = beam")
 
                 # set comb length for tracking outputs
@@ -148,6 +162,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 )
 
             else:
+                logger.debug("Switching Tao track_type to single")
                 output = self.tao.cmd("set global track_type = single")
 
                 # remove comb output variables when switching back to single particle tracking
@@ -161,6 +176,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
                         self._variables.pop(var)
 
             if len(output) > 0:
+                logger.warning("Warning while setting track_type: %s", "".join(output))
                 warnings.warn(f"Warning while setting track_type: {''.join(output)}")
             values.pop("track_type")
 
@@ -168,6 +184,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         if "input_beam" in values.keys():
             input_beam = values.pop("input_beam")
             fname = getcwd() + "/input_beam.h5"
+            logger.debug("Writing input beam to %s", fname)
             input_beam.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
 
@@ -178,6 +195,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         # map pvdata to tao commands and evaluate
         tao_cmds = self.transformer.get_tao_commands(self.tao, values)
+        logger.debug("Evaluating %d Tao commands", len(tao_cmds))
         evaluate_tao(self.tao, tao_cmds)
 
         # update state with new input / output values
@@ -187,6 +205,7 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """
         Update the model state by reading all supported variables.
         """
+        logger.debug("Updating model state for %d supported variables", len(self.supported_variables))
 
         # iterate through all supported variables to get their current values and update the state
         for name in self.supported_variables.keys():
@@ -230,6 +249,8 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
             else:
                 # for other variables, use the transformer to get the value from Tao
                 self._state[name] = self.transformer.get_tao_property(self.tao, name)
+
+        logger.debug("Model state update complete")
 
     @property
     def control_name_to_bmad(self):
@@ -277,8 +298,14 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """set the initial particle distribution for tracking"""
         if self.tao.tao_global()["track_type"] == "beam":
             fname = getcwd() + "/input_beam.h5"
+            logger.debug("Setting initial particles from %s", fname)
             particles.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
+
+            # after setting the initial particles, we need to update the model state 
+            # to reflect the new particle distribution and any changes to output 
+            # variables that depend on the input beam
+            self.update_state()
         else:
             raise ValueError(
                 "Cannot set initial_particles when track_type is not 'beam'"
@@ -299,4 +326,5 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
     def reset(self):
         """Reset the model to its initial state."""
+        logger.info("Resetting model to initial state")
         self.set(self._initial_state)

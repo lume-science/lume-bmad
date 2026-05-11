@@ -198,3 +198,15 @@ class TestModel:
         model.set({"track_type": 1})
         for name in model.supported_variables.keys():
             model.get(name)
+
+    def test_setting_initial_particles_updates_state(self, model):
+        model.set({"track_type": 1})
+        particles = ParticleGroup(TEST_BEAM_PATH)
+
+        # add a dummy value that should be updated when the state is updated after setting the initial particles
+        model._state["mat6"] = np.zeros((len(model.tao.lat_list("*", "ele.name")), 6, 6))
+
+        # after setting the initial particles, the model state should be updated to reflect the new beam
+        model.initial_particles = particles
+        assert model.initial_particles == particles
+        assert not np.all(model._state["mat6"] == 0)
