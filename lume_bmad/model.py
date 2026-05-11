@@ -302,9 +302,14 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
             particles.write(fname)
             self.tao.cmd(f"set beam_init position_file = {fname}")
 
-            # after setting the initial particles, we need to update the model state 
-            # to reflect the new particle distribution and any changes to output 
+            # after setting the initial particles, we need to update the comb variables
+            # and the model state to reflect the new particle distribution and any changes to output 
             # variables that depend on the input beam
+            self.tao.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
+            tao_model_output_variables = get_tao_output_variables(self.tao)
+            self._variables.update(tao_model_output_variables)
+
+            # update the model state
             self.update_state()
         else:
             raise ValueError(
