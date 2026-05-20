@@ -225,7 +225,12 @@ class LUMEBmadModel(LUMEModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
             # handle reading all of the per-element tao tracking outputs
             elif name in TAO_OUTPUT_UNITS.keys():
-                lat_values = self.tao.lat_list("*", "ele." + name)
+                # we rename the s variable to s_ele to avoid confusion with the s variable in comb outputs
+                if name=="s_ele":
+                    lat_values = self.tao.lat_list("*", "ele.s")
+                else:
+                    lat_values = self.tao.lat_list("*", "ele." + name)
+                
                 if name == "name":
                     # Keep element names as object dtype to avoid fixed-width unicode dtypes.
                     self._state[name] = np.asarray(lat_values, dtype=object)

@@ -9,6 +9,7 @@ from pytao import Tao
 
 TAO_OUTPUT_UNITS = {
     "name": "",
+    "s_ele": "m",
     "ix_ele": "",
     "ix_branch": "",
     "a.beta": "m",
@@ -113,38 +114,6 @@ def evaluate_tao(tao: Tao, tao_cmds: list[str]) -> None:
     tao.cmd("set global lattice_calc_on = F")
     tao.cmds(tao_cmds)
     tao.cmd("set global lattice_calc_on = T")
-
-
-def get_tao_lat_list_outputs(tao: Tao) -> dict[str, list[Any]]:
-    """
-    Returns dictionary of Tao output values including element name, twiss and rmats at all elements.
-
-    Parameters
-    ----------
-    tao: Tao
-        Instance of the Tao class.
-
-    Returns
-    -------
-    dict[str, list[Any]]
-        Dictionary mapping output variable names to their values at each element in a lattice.
-    """
-    # populate output dictionary
-    outputs = {}
-    lattice_elements = tao.lat_list("*", "ele.name")
-    for k in TAO_OUTPUT_UNITS.keys():
-        output = tao.lat_list("*", "ele." + k)
-        if k == "name":
-            outputs[k] = np.asarray(output, dtype=object)
-        else:
-            outputs.update(
-                {
-                    ele + k.replace("ele", ""): val
-                    for ele, val in zip(lattice_elements, output)
-                }
-            )
-
-    return outputs
 
 
 def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
