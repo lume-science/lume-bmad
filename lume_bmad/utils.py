@@ -26,7 +26,7 @@ TAO_OUTPUT_UNITS = {
     "b.phi": "",
     "l": "m",
     "e_tot": "eV",
-    "p0c": "eV",
+    "p0c": "eV/c",
     "mat6": "",
     "vec0": "m",
 }
