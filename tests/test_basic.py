@@ -11,7 +11,6 @@ from lume_bmad.actions import (
     ScreenImageVariable,
     ScreenResolutionVariable,
     ScreenSpec,
-    ScreenVariable,
 )
 from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
 from beamphysics import ParticleGroup
@@ -69,7 +68,7 @@ class TestModel:
         control_variables = [
             EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
             EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
-            ScreenVariable(
+            ScreenImageVariable(
                 name="qf_screen",
                 shape=(100, 100),
                 pixel_size=0.002,
