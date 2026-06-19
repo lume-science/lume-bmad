@@ -1,3 +1,4 @@
+from lume_bmad.actions import CombStatVariable, StatVariable
 import numpy as np
 import yaml
 from lume.variables import ScalarVariable, NDVariable
@@ -144,9 +145,9 @@ def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
     return beam_info
 
 
-def get_tao_output_variables(tao: Tao) -> dict[str, NDVariable]:
+def get_tao_stat_output_variables(tao: Tao) -> list[StatVariable]:
     """
-    returns dictionary of output variables
+    Returns list of StatVariable instances for Tao lattice outputs.
 
     Parameters
     ----------
@@ -155,23 +156,22 @@ def get_tao_output_variables(tao: Tao) -> dict[str, NDVariable]:
 
     Returns
     -------
-    dict[str, NDVariable]
-        A dictionary of NDVariables.
+    list[StatVariable]
+        A list of StatVariable instances.
 
     """
     elements = tao.lat_list("*", "ele.name")
     element_count = len(elements)
-    out_dict = {}
+    out_list = []
 
-    # handle lat_list outputs first
     for parameter_name in TAO_OUTPUT_UNITS.keys():
         if parameter_name in ["name"]:
             # Avoid fixed-width unicode dtypes (<U0, <U12, ...) so any name length is valid.
-            data_type_ = object
+            data_type_ = np.dtype(object)
         elif parameter_name in ["ix_ele"]:
-            data_type_ = np.int32
+            data_type_ = np.dtype(np.int32)
         else:
-            data_type_ = float
+            data_type_ = np.dtype(float)
 
         if parameter_name == "mat6":
             shape = (element_count, 6, 6)
@@ -180,28 +180,71 @@ def get_tao_output_variables(tao: Tao) -> dict[str, NDVariable]:
         else:
             shape = (element_count,)
 
-        out_dict[parameter_name] = NDVariable(
+        out_list.append(StatVariable(
             name=parameter_name,
+            statistic_name=parameter_name,
             shape=shape,
             unit=TAO_OUTPUT_UNITS[parameter_name],
             read_only=True,
             dtype=data_type_,
-        )
+        ))
+
+    return out_list
+
+
+def get_tao_comb_output_variables(tao: Tao) -> list[CombStatVariable]:
+    """
+    Returns list of CombStatVariable instances for Tao comb outputs.
+
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    list[CombStatVariable]
+        A list of CombStatVariable instances.
+
+    """
+    out_list = []
 
     # handle comb outputs
     if tao.tao_global()["track_type"] == "beam":
         s = tao.bunch_comb("s")
         shape = s.shape
         for parameter_name in TAO_COMB_OUTPUT_UNITS.keys():
-            out_dict[parameter_name] = NDVariable(
+            out_list.append(CombStatVariable(
                 name=parameter_name,
+                statistic_name=parameter_name,
                 shape=shape,
                 unit=TAO_COMB_OUTPUT_UNITS[parameter_name],
                 read_only=True,
-                dtype=float,
-            )
+                dtype=np.dtype(float),
+            ))
 
-    return out_dict
+    return out_list
+
+
+def get_tao_output_variables(tao: Tao) -> list[StatVariable | CombStatVariable]:
+    """
+    Returns all available Tao output variables, including lattice and comb outputs.
+
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    list[StatVariable | CombStatVariable]
+        A list of StatVariable and CombStatVariable instances.
+
+    """
+    return [
+        *get_tao_stat_output_variables(tao),
+        *get_tao_comb_output_variables(tao),
+    ]
 
 
 def rmat_get(tao, element_a, element_b, design=False):
