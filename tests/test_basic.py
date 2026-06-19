@@ -5,9 +5,15 @@ from pathlib import Path
 from pytao import Tao
 
 from lume_bmad.model import LUMEBmadModel
-from lume_bmad.actions import EleScalarVariable, ScreenVariable
+from lume_bmad.actions import (
+    EleScalarVariable,
+    ScreenImageShapeVariable,
+    ScreenImageVariable,
+    ScreenResolutionVariable,
+    ScreenSpec,
+    ScreenVariable,
+)
 from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
-from lume.variables import NDVariable, ScalarVariable
 from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
@@ -22,9 +28,7 @@ class TestModel:
         ]
         tao = Tao(init_file="tests/fodo.init", noplot=True)
 
-        model = LUMEBmadModel(
-            tao, control_variables, dump_locations=["qf", "qd"]
-        )
+        model = LUMEBmadModel(tao, control_variables, dump_locations=["qf", "qd"])
         return model
 
     def test_model_initialization(self, model):
@@ -66,7 +70,7 @@ class TestModel:
             EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
             EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
             ScreenVariable(
-                name="qf_screen", 
+                name="qf_screen",
                 shape=(100, 100),
                 pixel_size=0.002,
                 element_name="qf",
@@ -82,6 +86,55 @@ class TestModel:
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
         assert qf_screen.shape == (100, 100)
+
+    def test_screen_variables_from_shared_spec(self, model):
+        screen_spec = ScreenSpec(
+            element_name="qf",
+            shape=(80, 60),
+            pixel_size=0.0015,
+        )
+
+        control_variables = [
+            EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
+            ScreenImageVariable.from_screen_spec(
+                name="qf_screen_image",
+                screen_spec=screen_spec,
+            ),
+            ScreenResolutionVariable.from_screen_spec(
+                name="qf_screen_resolution",
+                screen_spec=screen_spec,
+            ),
+            ScreenImageShapeVariable.from_screen_spec(
+                name="qf_screen_shape_x",
+                screen_spec=screen_spec,
+                index=0,
+            ),
+            ScreenImageShapeVariable.from_screen_spec(
+                name="qf_screen_shape_y",
+                screen_spec=screen_spec,
+                index=1,
+            ),
+        ]
+
+        model = LUMEBmadModel(
+            Tao(init_file="tests/fodo.init", noplot=True),
+            control_variables,
+            dump_locations=["qf", "qd"],
+        )
+
+        values = model.get(
+            [
+                "qf_screen_image",
+                "qf_screen_resolution",
+                "qf_screen_shape_x",
+                "qf_screen_shape_y",
+            ]
+        )
+        assert values["qf_screen_image"].shape == (80, 60)
+        assert np.allclose(values["qf_screen_resolution"], 0.0015)
+        assert values["qf_screen_shape_x"] == 80
+        assert values["qf_screen_shape_y"] == 60
 
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
@@ -190,7 +243,9 @@ class TestModel:
         particles = ParticleGroup(TEST_BEAM_PATH)
 
         # add a dummy value that should be updated when the state is updated after setting the initial particles
-        model._state["mat6"] = np.zeros((len(model.tao.lat_list("*", "ele.name")), 6, 6))
+        model._state["mat6"] = np.zeros(
+            (len(model.tao.lat_list("*", "ele.name")), 6, 6)
+        )
 
         # after setting the initial particles, the model state should be updated to reflect the new beam
         model.initial_particles = particles

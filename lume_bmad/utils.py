@@ -1,7 +1,7 @@
 from lume_bmad.actions import CombStatVariable, StatVariable
 import numpy as np
 import yaml
-from lume.variables import ScalarVariable, NDVariable
+from lume.variables import ScalarVariable
 from typing import Any
 from pytao import Tao
 
@@ -95,56 +95,6 @@ def import_output_variables(output_variable_file: str):
     return out_dict
 
 
-def evaluate_tao(tao: Tao, tao_cmds: list[str]) -> None:
-    """
-    Evaluate tao commands, toggles lattice_calculation OFF/ON
-    between command list
-
-    Parameters
-    ----------
-    tao: Tao
-        Instance of the Tao class.
-    tao_cmds: list[str]
-        List of Tao commands to execute.
-
-    Returns
-    -------
-    None
-
-    """
-    tao.cmd("set global lattice_calc_on = F")
-    tao.cmds(tao_cmds)
-    tao.cmd("set global lattice_calc_on = T")
-
-
-def get_beam_info(tao: Tao) -> dict[str, list[Any]]:
-    """
-    Returns dictionary of beam tracking information
-
-    Parameters
-    ----------
-    tao: Tao
-        Instance of the Tao class.
-
-    Returns
-    -------
-    dict[str, list[Any]]
-        Dictionary mapping beam tracking beam or single particle and beam saved at element list
-
-    """
-    beam_info = {}
-    lines = tao.cmd("python show beam")
-    track_type = [line.split("=") for line in lines if "global%track_type" in line][0][
-        1
-    ]
-    beam_info["track_type"] = track_type[2:-1]
-    saved_at = [line.split("=") for line in lines if "saved_at" in line][0][1]
-    saved_at = saved_at.strip(' "').split(",")
-    beam_info["saved_at"] = [s.strip(" ") for s in saved_at]
-
-    return beam_info
-
-
 def get_tao_stat_output_variables(tao: Tao) -> list[StatVariable]:
     """
     Returns list of StatVariable instances for Tao lattice outputs.
@@ -180,14 +130,16 @@ def get_tao_stat_output_variables(tao: Tao) -> list[StatVariable]:
         else:
             shape = (element_count,)
 
-        out_list.append(StatVariable(
-            name=parameter_name,
-            statistic_name=parameter_name,
-            shape=shape,
-            unit=TAO_OUTPUT_UNITS[parameter_name],
-            read_only=True,
-            dtype=data_type_,
-        ))
+        out_list.append(
+            StatVariable(
+                name=parameter_name,
+                statistic_name=parameter_name,
+                shape=shape,
+                unit=TAO_OUTPUT_UNITS[parameter_name],
+                read_only=True,
+                dtype=data_type_,
+            )
+        )
 
     return out_list
 
@@ -214,14 +166,16 @@ def get_tao_comb_output_variables(tao: Tao) -> list[CombStatVariable]:
         s = tao.bunch_comb("s")
         shape = s.shape
         for parameter_name in TAO_COMB_OUTPUT_UNITS.keys():
-            out_list.append(CombStatVariable(
-                name=parameter_name,
-                statistic_name=parameter_name,
-                shape=shape,
-                unit=TAO_COMB_OUTPUT_UNITS[parameter_name],
-                read_only=True,
-                dtype=np.dtype(float),
-            ))
+            out_list.append(
+                CombStatVariable(
+                    name=parameter_name,
+                    statistic_name=parameter_name,
+                    shape=shape,
+                    unit=TAO_COMB_OUTPUT_UNITS[parameter_name],
+                    read_only=True,
+                    dtype=np.dtype(float),
+                )
+            )
 
     return out_list
 

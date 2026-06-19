@@ -1,22 +1,16 @@
 from os import getcwd
 import logging
-import warnings
 from beamphysics import ParticleGroup
-import numpy as np
 from typing import Any
-from lume.model import LUMEModel
 from lume.staged_model import InitialParticlesMixIn, FinalParticlesMixIn
-from lume.variables import ScalarVariable, Variable, ParticleGroupVariable
 from pytao import Tao
 from lume_bmad.utils import (
-    evaluate_tao,
     get_tao_output_variables,
-    TAO_OUTPUT_UNITS,
     TAO_COMB_OUTPUT_UNITS,
     get_tao_comb_output_variables,
 )
 from lume.actions import ActionModel, ActionVariable
-from lume_bmad.actions import TrackTypeAction, CombStatVariable, BeamAtElementVariable
+from lume_bmad.actions import TrackTypeAction, BeamAtElementVariable
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +60,13 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         self.comb_ds_save = comb_ds_save
         logger.debug("Initializing LUMEBmadModel with comb_ds_save=%s", comb_ds_save)
+        self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
 
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.simulator)
 
         for var in model_output_variables:
             self.register_action_variable(var)
-
 
         # add track_type variable to control variables to allow toggling between single particle and beam tracking
         self.register_action_variable(TrackTypeAction())
@@ -111,7 +105,9 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             beam_variable_name = f"{element_name}_beam"
             if in_beam_mode:
                 self.register_action_variable(
-                    BeamAtElementVariable(name=beam_variable_name, element_name=element_name)
+                    BeamAtElementVariable(
+                        name=beam_variable_name, element_name=element_name
+                    )
                 )
             elif beam_variable_name in self.supported_variables:
                 self.unregister_action_variable(beam_variable_name)
@@ -157,10 +153,6 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         # after setting all variables, turn eager mode back on
         self.simulator.cmd("set global lattice_calc_on = T")
 
-        # In beam mode, ensure comb outputs are allocated before reading them.
-        if self.simulator.tao_global()["track_type"] == "beam":
-            self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
-
         # track_type toggles the set of supported read-only outputs.
         self._refresh_dynamic_action_variables()
 
@@ -171,14 +163,17 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """
         Update the model state by reading all supported variables.
         """
-        logger.debug("Updating model state for %d supported variables", len(self.supported_variables))
+        logger.debug(
+            "Updating model state for %d supported variables",
+            len(self.supported_variables),
+        )
         for name in self.supported_variables.keys():
             try:
                 self._state[name] = self.supported_variables[name]._get(self.simulator)
             except Exception as e:
                 logger.error("Error getting variable %s: %s", name, str(e))
                 raise e
-        
+
         logger.debug("Model state update complete")
 
     @property
@@ -222,7 +217,7 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             self.simulator.cmd(f"set beam_init position_file = {fname}")
 
             # after setting the initial particles, we need to update the comb variables
-            # and the model state to reflect the new particle distribution and any changes to output 
+            # and the model state to reflect the new particle distribution and any changes to output
             # variables that depend on the input beam
             self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
             self._refresh_dynamic_action_variables()
