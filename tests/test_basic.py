@@ -5,9 +5,14 @@ from pathlib import Path
 from pytao import Tao
 
 from lume_bmad.model import LUMEBmadModel
+from lume_bmad.actions import (
+    EleScalarVariable,
+    ScreenImageShapeVariable,
+    ScreenImageVariable,
+    ScreenResolutionVariable,
+    ScreenSpec,
+)
 from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
-from lume.variables import NDVariable, ScalarVariable
-from lume_bmad.transformer import BasicTransformer
 from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
@@ -16,16 +21,13 @@ TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
 class TestModel:
     @pytest.fixture
     def model(self):
-        control_variables = {
-            "qf:B1_GRADIENT": ScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
-            "qd:B1_GRADIENT": ScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
-        }
-        transformer = BasicTransformer({})
+        control_variables = [
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+        ]
         tao = Tao(init_file="tests/fodo.init", noplot=True)
 
-        model = LUMEBmadModel(
-            tao, control_variables, {}, transformer, dump_locations=["qf", "qd"]
-        )
+        model = LUMEBmadModel(tao, control_variables, dump_locations=["qf", "qd"])
         return model
 
     def test_model_initialization(self, model):
@@ -40,8 +42,8 @@ class TestModel:
         assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.2
 
     def test_beam_tracking(self, model):
-        # set track_type to 1 to enable tracking
-        model.set({"track_type": 1})
+        # set track_type to "beam" to enable tracking
+        model.set({"track_type": "beam"})
 
         output_beam = model.final_particles
         assert isinstance(output_beam, ParticleGroup)
@@ -62,40 +64,76 @@ class TestModel:
             assert beam.n_particle == 1000
 
     def test_screen(self, model):
-        # set track_type to 1 to enable tracking
-        control_variables = {
-            "qf:B1_GRADIENT": ScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
-            "qd:B1_GRADIENT": ScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
-        }
-        output_variables = {
-            "qf_screen": NDVariable(name="qf_screen", read_only=True, shape=(100, 100)),
-        }
-
-        class ScreenTransformer(BasicTransformer):
-            def get_tao_property(self, tao, control_name):
-                if control_name == "qf_screen":
-                    if tao.tao_global()["track_type"] != "beam":
-                        return np.zeros((100, 100))
-                    beam = tao.particles("qf")
-                    # simple screen that counts number of particles
-                    hist, _ = beam.histogramdd(
-                        "x", "y", bins=(100, 100), range=((-0.1, 0.1), (-0.1, 0.1))
-                    )
-                    return hist
-                else:
-                    return super().get_tao_property(tao, control_name)
+        # set track_type to "beam" to enable tracking
+        control_variables = [
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+            ScreenImageVariable(
+                name="qf_screen",
+                shape=(100, 100),
+                pixel_size=0.002,
+                element_name="qf",
+            ),
+        ]
 
         model = LUMEBmadModel(
             Tao(init_file="tests/fodo.init", noplot=True),
             control_variables,
-            output_variables,
-            ScreenTransformer({}),
             dump_locations=["qf", "qd"],
         )
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
         assert qf_screen.shape == (100, 100)
+
+    def test_screen_variables_from_shared_spec(self, model):
+        screen_spec = ScreenSpec(
+            element_name="qf",
+            shape=(80, 60),
+            pixel_size=0.0015,
+        )
+
+        control_variables = [
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+            ScreenImageVariable.from_screen_spec(
+                name="qf_screen_image",
+                screen_spec=screen_spec,
+            ),
+            ScreenResolutionVariable.from_screen_spec(
+                name="qf_screen_resolution",
+                screen_spec=screen_spec,
+            ),
+            ScreenImageShapeVariable.from_screen_spec(
+                name="qf_screen_shape_x",
+                screen_spec=screen_spec,
+                index=0,
+            ),
+            ScreenImageShapeVariable.from_screen_spec(
+                name="qf_screen_shape_y",
+                screen_spec=screen_spec,
+                index=1,
+            ),
+        ]
+
+        model = LUMEBmadModel(
+            Tao(init_file="tests/fodo.init", noplot=True),
+            control_variables,
+            dump_locations=["qf", "qd"],
+        )
+
+        values = model.get(
+            [
+                "qf_screen_image",
+                "qf_screen_resolution",
+                "qf_screen_shape_x",
+                "qf_screen_shape_y",
+            ]
+        )
+        assert values["qf_screen_image"].shape == (80, 60)
+        assert np.allclose(values["qf_screen_resolution"], 0.0015)
+        assert values["qf_screen_shape_x"] == 80
+        assert values["qf_screen_shape_y"] == 60
 
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
@@ -111,15 +149,15 @@ class TestModel:
 
     def test_track_type_toggle_updates_beam_state(self, model):
         # start in beam tracking mode and verify beam outputs are populated
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         tracked = model.get(["track_type", "qf_beam", "qd_beam"])
-        assert tracked["track_type"] == 1
+        assert tracked["track_type"] == "beam"
         assert isinstance(tracked["qf_beam"], ParticleGroup)
         assert isinstance(tracked["qd_beam"], ParticleGroup)
 
         # switching back to single-particle mode should clear beam dumps
-        model.set({"track_type": 0})
-        assert model.get("track_type") == 0
+        model.set({"track_type": "single"})
+        assert model.get("track_type") == "single"
 
         # In single mode update_state removes the beam dumps from the list of supported variables
         for var in ["qf_beam", "qd_beam"]:
@@ -160,7 +198,7 @@ class TestModel:
         assert expected.issubset(set(supported.keys()))
 
         # setting track_type to beam should add to the list of expected pvs
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         supported = model.supported_variables
         expected.update(set(TAO_COMB_OUTPUT_UNITS.keys()))
         assert expected.issubset(set(supported.keys()))
@@ -171,7 +209,7 @@ class TestModel:
         assert len(comb_output) == 23
 
         # setting track_type back to single should remove comb output variables
-        model.set({"track_type": 0})
+        model.set({"track_type": "single"})
         supported = model.supported_variables
         expected.difference_update(set(TAO_COMB_OUTPUT_UNITS.keys()))
         assert expected.issubset(set(supported.keys()))
@@ -181,7 +219,7 @@ class TestModel:
             model.get("x.beta")
 
         # adding an initial beam should update the length of the comb output variables
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
 
         comb_output = model.get("x.beta")
@@ -195,16 +233,18 @@ class TestModel:
             model.get(name)
 
         # run the model in beam tracking mode and then try to get all variables again, including beam variables
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         for name in model.supported_variables.keys():
             model.get(name)
 
     def test_setting_initial_particles_updates_state(self, model):
-        model.set({"track_type": 1})
+        model.set({"track_type": "beam"})
         particles = ParticleGroup(TEST_BEAM_PATH)
 
         # add a dummy value that should be updated when the state is updated after setting the initial particles
-        model._state["mat6"] = np.zeros((len(model.tao.lat_list("*", "ele.name")), 6, 6))
+        model._state["mat6"] = np.zeros(
+            (len(model.tao.lat_list("*", "ele.name")), 6, 6)
+        )
 
         # after setting the initial particles, the model state should be updated to reflect the new beam
         model.initial_particles = particles
