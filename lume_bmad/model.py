@@ -62,6 +62,18 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         logger.debug("Initializing LUMEBmadModel with comb_ds_save=%s", comb_ds_save)
         self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
 
+        # raise a warning if track_start is not the first element in the lattice
+        # NOTE: the first element in self.tao.lat_list("*", "ele.name") is "BEGINNING", so we grab the second element for the check
+        if self.tao.beam(0)["track_start"] != self.tao.lat_list("*", "ele.name")[1]:
+            msg = (
+                f"Warning: track_start is set to {self.tao.beam(0)['track_start']}, "
+                f"which is not the first element in the lattice {self.tao.lat_list('*', 'ele.name')[1]}. "
+                "This may lead to unexpected behavior if the initial particles "
+                "are not properly initialized at the track_start element."
+            )
+            logger.warning(msg)
+            warnings.warn(msg)
+
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.simulator)
 
