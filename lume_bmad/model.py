@@ -159,10 +159,14 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         self.simulator.cmd("set global lattice_calc_on = F")
 
         # set control variables using their respective set methods
-        super()._set(values)
-
-        # after setting all variables, turn eager mode back on
-        self.simulator.cmd("set global lattice_calc_on = T")
+        try:
+            super()._set(values)
+        except Exception:
+            logger.error("Error setting variables: %s")
+            raise
+        finally:
+            # after setting all variables, turn eager mode back on
+            self.simulator.cmd("set global lattice_calc_on = T")
 
         # track_type toggles the set of supported read-only outputs.
         self._refresh_dynamic_action_variables()
@@ -181,9 +185,9 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         for name in self.supported_variables.keys():
             try:
                 self._state[name] = self.supported_variables[name]._get(self.simulator)
-            except Exception as e:
-                logger.error("Error getting variable %s: %s", name, str(e))
-                raise e
+            except Exception:
+                logger.error("Error getting variable %s", name)
+                raise
 
         logger.debug("Model state update complete")
 
