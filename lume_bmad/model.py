@@ -72,7 +72,6 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
                 "are not properly initialized at the track_start element."
             )
             logger.warning(msg)
-            warnings.warn(msg)
 
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.simulator)
