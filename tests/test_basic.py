@@ -22,8 +22,8 @@ class TestModel:
     @pytest.fixture
     def model(self):
         control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
         ]
         tao = Tao(init_file="tests/fodo.init", noplot=True)
 
@@ -66,8 +66,8 @@ class TestModel:
     def test_screen(self, model):
         # set track_type to "beam" to enable tracking
         control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
             ScreenImageVariable(
                 name="qf_screen",
                 shape=(100, 100),
@@ -94,8 +94,8 @@ class TestModel:
         )
 
         control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", units="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", units="1/m^2"),
+            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
             ScreenImageVariable.from_screen_spec(
                 name="qf_screen_image",
                 screen_spec=screen_spec,
