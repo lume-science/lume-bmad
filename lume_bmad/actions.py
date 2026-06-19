@@ -60,7 +60,7 @@ class CombStatVariable(NDVariable, ReadOnlyActionMixin):
             return simulator.bunch_comb(self.statistic_name)
         else:
             raise ValueError(
-                "CombStatAction can only be used when track_type is 'beam'."
+                "CombStatVariable can only be used when track_type is 'beam'."
             )
 
 
