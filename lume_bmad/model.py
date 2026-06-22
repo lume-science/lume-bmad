@@ -56,6 +56,7 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             Length frequency of dumping tracked beam parameters for tao comb command. Default is 0.1 m.
 
         """
+        self._state = {}
         super().__init__(simulator=tao, action_variables=action_variables)
 
         self.comb_ds_save = comb_ds_save
@@ -91,7 +92,6 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         self._refresh_dynamic_action_variables()
 
         # get initial state of the model
-        self._state = {}
         self.update_state()
 
         self._initial_state = self._state.copy()
@@ -173,6 +173,22 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         # update state with new input / output values
         self.update_state()
+
+
+    def register_action_variable(self, variable: ActionVariable) -> None:
+        """
+        Register an action variable with the model.
+
+        This method adds the variable to the supported variables and initializes its value in the state.
+
+        Parameters
+        ----------
+        variable : ActionVariable
+            The action variable to register
+        """
+        super().register_action_variable(variable)
+        self._state[variable.name] = variable._get(self.simulator)
+
 
     def update_state(self) -> None:
         """
