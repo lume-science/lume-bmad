@@ -30,6 +30,27 @@ class EleScalarVariable(ScalarVariable, WritableActionMixin):
         simulator.cmd(f"set ele {self.element_name} {self.property_name} = {value}")
 
 
+class ScaledEleScalarVariable(EleScalarVariable):
+    """
+    Action that operates on a single scalar variable in the Bmad model, with a scaling factor applied.
+    
+    Values are multiplied by `scale_factor` when setting the variable in the simulator, and 
+    divided by `scale_factor` when retrieving the variable from the simulator.
+    """
+
+    scale_factor: float = 1.0
+
+    def _get(self, simulator: Tao) -> Any:
+        value = super()._get(simulator)
+        return value / self.scale_factor
+    
+    def _set(self, simulator: Tao, value: Any) -> None:
+        logger.debug(f"Setting {self.name} to {value}")
+        scaled_value = value * self.scale_factor
+        simulator.cmd(f"set ele {self.element_name} {self.property_name} = {scaled_value}")
+
+
+
 class StatVariable(NDVariable, ReadOnlyActionMixin):
     """Action that operates on a single statistic in the Bmad model."""
 
