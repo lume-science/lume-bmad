@@ -5,6 +5,7 @@ import numpy as np
 from lume.actions import ReadOnlyActionMixin, WritableActionMixin
 from lume.variables import (
     ScalarVariable,
+    IntVariable,
     NDVariable,
     EnumVariable,
     ParticleGroupVariable,
@@ -18,16 +19,15 @@ logger = logging.getLogger(__name__)
 
 class EleScalarVariable(ScalarVariable, WritableActionMixin):
     """Action that operates on a single scalar variable in the Bmad model."""
+    element_name: str
+    property_name: str
 
     def _get(self, simulator: Tao) -> Any:
-        return simulator.ele_gen_attribs(self.name.split(":")[0])[
-            self.name.split(":")[1]
-        ]
+        return simulator.ele_gen_attribs(self.element_name)[self.property_name]
 
     def _set(self, simulator: Tao, value: Any) -> None:
-        element_name, property_name = self.name.split(":")
         logger.debug(f"Setting {self.name} to {value}")
-        simulator.cmd(f"set ele {element_name} {property_name} = {value}")
+        simulator.cmd(f"set ele {self.element_name} {self.property_name} = {value}")
 
 
 class StatVariable(NDVariable, ReadOnlyActionMixin):
@@ -145,7 +145,7 @@ class _ScreenSpecVariableMixin:
 
 
 class ScreenImageVariable(_ScreenSpecVariableMixin, NDVariable, ReadOnlyActionMixin):
-    """Read-only action that returns a screen image at a given element."""
+    """Read-only action that returns a screen image at a given element. The image is normalized to a unit scale"""
 
     pixel_size: float  # default pixel size in meters
     read_only: bool = True
@@ -161,7 +161,7 @@ class ScreenImageVariable(_ScreenSpecVariableMixin, NDVariable, ReadOnlyActionMi
 
     def _get(self, simulator: Tao) -> Any:
         if simulator.tao_global()["track_type"] != "beam":
-            return np.zeros(self.shape)
+            return np.zeros(self.shape)  # empty image for non-beam tracks
 
         beam = simulator.particles(self.element_name)
 
@@ -173,6 +173,10 @@ class ScreenImageVariable(_ScreenSpecVariableMixin, NDVariable, ReadOnlyActionMi
             bins=self.shape,
             range=((-half_width[0], half_width[0]), (-half_width[1], half_width[1])),
         )
+
+        # normalize to unit scale
+        hist /= np.max(hist) if np.max(hist) > 0 else 1.0
+
         return hist
 
 
@@ -199,7 +203,7 @@ class ScreenResolutionVariable(
 
 
 class ScreenImageShapeVariable(
-    _ScreenSpecVariableMixin, ScalarVariable, ReadOnlyActionMixin
+    _ScreenSpecVariableMixin, IntVariable, ReadOnlyActionMixin
 ):
     """Read-only action that returns the pixel shape of the screen image."""
 

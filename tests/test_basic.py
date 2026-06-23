@@ -22,8 +22,12 @@ class TestModel:
     @pytest.fixture
     def model(self):
         control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+            EleScalarVariable(
+                name="qf:B1_GRADIENT", unit="1/m^2", element_name="qf", property_name="B1_GRADIENT"
+            ),
+            EleScalarVariable(
+                name="qd:B1_GRADIENT", unit="1/m^2", element_name="qd", property_name="B1_GRADIENT"
+            ),
         ]
         tao = Tao(init_file="tests/fodo.init", noplot=True)
 
@@ -65,9 +69,7 @@ class TestModel:
 
     def test_screen(self, model):
         # set track_type to "beam" to enable tracking
-        control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+        extra_control_variables = [
             ScreenImageVariable(
                 name="qf_screen",
                 shape=(100, 100),
@@ -75,12 +77,8 @@ class TestModel:
                 element_name="qf",
             ),
         ]
-
-        model = LUMEBmadModel(
-            Tao(init_file="tests/fodo.init", noplot=True),
-            control_variables,
-            dump_locations=["qf", "qd"],
-        )
+        for var in extra_control_variables:
+            model.register_action_variable(var)
         model.set({"track_type": "beam"})
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
@@ -89,13 +87,11 @@ class TestModel:
     def test_screen_variables_from_shared_spec(self, model):
         screen_spec = ScreenSpec(
             element_name="qf",
-            shape=(80, 60),
+            shape=(60, 80),
             pixel_size=0.0015,
         )
 
-        control_variables = [
-            EleScalarVariable(name="qf:B1_GRADIENT", unit="1/m^2"),
-            EleScalarVariable(name="qd:B1_GRADIENT", unit="1/m^2"),
+        extra_control_variables = [
             ScreenImageVariable.from_screen_spec(
                 name="qf_screen_image",
                 screen_spec=screen_spec,
@@ -116,11 +112,8 @@ class TestModel:
             ),
         ]
 
-        model = LUMEBmadModel(
-            Tao(init_file="tests/fodo.init", noplot=True),
-            control_variables,
-            dump_locations=["qf", "qd"],
-        )
+        for var in extra_control_variables:
+            model.register_action_variable(var)
 
         values = model.get(
             [
@@ -130,10 +123,10 @@ class TestModel:
                 "qf_screen_shape_y",
             ]
         )
-        assert values["qf_screen_image"].shape == (80, 60)
+        assert values["qf_screen_image"].shape == (60, 80)
         assert np.allclose(values["qf_screen_resolution"], 0.0015)
-        assert values["qf_screen_shape_x"] == 80
-        assert values["qf_screen_shape_y"] == 60
+        assert values["qf_screen_shape_x"] == 60
+        assert values["qf_screen_shape_y"] == 80
 
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
