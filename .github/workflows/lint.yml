@@ -1,0 +1,66 @@
+name: Lint
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  delete-cancelled-runs:
+    permissions:
+      actions: write
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'MercuryTechnologies/delete-cancelled-runs@1.0.0'
+        with:
+          workflow-file: 'lint.yml'
+          max-deletions: 1
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --extra dev --python 3.11
+
+      - name: List Python package versions
+        run: uv pip list
+
+      - name: Run notebook clearing check first (no diff)
+        env:
+          RUFF_OUTPUT_FORMAT: github
+        run: |
+          uv run pre-commit run jupyter-notebook-clear-output --all-files
+
+      - name: Switch to a temporary branch
+        run: |
+          git checkout -b _ci_branch_
+
+      - name: Run pre-commit on all files
+        env:
+          RUFF_OUTPUT_FORMAT: github
+        run: |
+          uv run pre-commit run \
+            --show-diff-on-failure \
+            --color=always \
+            --all-files
