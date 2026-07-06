@@ -174,7 +174,6 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         # update state with new input / output values
         self.update_state()
 
-
     def register_action_variable(self, variable: ActionVariable) -> None:
         """
         Register an action variable with the model.
@@ -188,7 +187,6 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """
         super().register_action_variable(variable)
         self._state[variable.name] = variable._get(self.simulator)
-
 
     def update_state(self) -> None:
         """

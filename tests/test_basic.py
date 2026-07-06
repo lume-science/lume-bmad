@@ -23,10 +23,16 @@ class TestModel:
     def model(self):
         control_variables = [
             EleScalarVariable(
-                name="qf:B1_GRADIENT", unit="1/m^2", element_name="qf", property_name="B1_GRADIENT"
+                name="qf:B1_GRADIENT",
+                unit="1/m^2",
+                element_name="qf",
+                property_name="B1_GRADIENT",
             ),
             EleScalarVariable(
-                name="qd:B1_GRADIENT", unit="1/m^2", element_name="qd", property_name="B1_GRADIENT"
+                name="qd:B1_GRADIENT",
+                unit="1/m^2",
+                element_name="qd",
+                property_name="B1_GRADIENT",
             ),
         ]
         tao = Tao(init_file="tests/fodo.init", noplot=True)

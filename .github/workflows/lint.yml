@@ -46,12 +46,6 @@ jobs:
       - name: List Python package versions
         run: uv pip list
 
-      - name: Run notebook clearing check first (no diff)
-        env:
-          RUFF_OUTPUT_FORMAT: github
-        run: |
-          uv run pre-commit run jupyter-notebook-clear-output --all-files
-
       - name: Switch to a temporary branch
         run: |
           git checkout -b _ci_branch_
