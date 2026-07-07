@@ -269,4 +269,12 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
     def reset(self):
         """Reset the model to its initial state."""
         logger.info("Resetting model to initial state")
-        self.set(self._initial_state)
+
+        # get subset of initial state that corresponds to writable control variables
+        control_variable_names = [
+            name for name, var in self.supported_variables.items() if var.read_only is False
+        ]
+        # set initial control state, excluding beam-at-element variables since they are not writable
+        initial_control_state = {name: self._initial_state[name] for name in control_variable_names if not isinstance(self.supported_variables[name], BeamAtElementVariable)}
+
+        self.set(initial_control_state)

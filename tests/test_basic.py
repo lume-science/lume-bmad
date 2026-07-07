@@ -51,6 +51,8 @@ class TestModel:
         model.set({"qf:B1_GRADIENT": 0.2})
         assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.2
 
+        model.reset()
+
     def test_beam_tracking(self, model):
         # set track_type to "beam" to enable tracking
         model.set({"track_type": "beam"})
@@ -73,6 +75,9 @@ class TestModel:
             assert isinstance(beam, ParticleGroup)
             assert beam.n_particle == 1000
 
+        model.reset()
+
+
     def test_screen(self, model):
         # set track_type to "beam" to enable tracking
         extra_control_variables = [
@@ -89,6 +94,9 @@ class TestModel:
         qf_screen = model.get(["qf_screen"])["qf_screen"]
         assert isinstance(qf_screen, np.ndarray)
         assert qf_screen.shape == (100, 100)
+
+        model.reset()
+
 
     def test_screen_variables_from_shared_spec(self, model):
         screen_spec = ScreenSpec(
@@ -134,6 +142,9 @@ class TestModel:
         assert values["qf_screen_shape_x"] == 60
         assert values["qf_screen_shape_y"] == 80
 
+        model.reset()
+
+
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
         mat6 = model.get("mat6")
@@ -165,6 +176,8 @@ class TestModel:
 
         assert model.initial_particles is None
         assert model.final_particles is None
+
+        model.reset()
 
     def test_supported_variables_contains_model_interfaces(self, model):
         supported = model.supported_variables
@@ -225,6 +238,8 @@ class TestModel:
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 
+        model.reset()
+
     def test_getting_all_variables(self, model):
         variable_names = list(model.supported_variables.keys())
 
@@ -235,6 +250,7 @@ class TestModel:
         model.set({"track_type": "beam"})
         for name in model.supported_variables.keys():
             model.get(name)
+        model.reset()
 
     def test_setting_initial_particles_updates_state(self, model):
         model.set({"track_type": "beam"})
@@ -249,3 +265,5 @@ class TestModel:
         model.initial_particles = particles
         assert model.initial_particles == particles
         assert not np.all(model._state["mat6"] == 0)
+
+        model.reset()
