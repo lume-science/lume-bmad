@@ -77,7 +77,6 @@ class TestModel:
 
         model.reset()
 
-
     def test_screen(self, model):
         # set track_type to "beam" to enable tracking
         extra_control_variables = [
@@ -96,7 +95,6 @@ class TestModel:
         assert qf_screen.shape == (100, 100)
 
         model.reset()
-
 
     def test_screen_variables_from_shared_spec(self, model):
         screen_spec = ScreenSpec(
@@ -143,7 +141,6 @@ class TestModel:
         assert values["qf_screen_shape_y"] == 80
 
         model.reset()
-
 
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
