@@ -117,8 +117,8 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             if in_beam_mode:
                 self.register_action_variable(
                     BeamAtElementVariable(
-                        name=beam_variable_name, 
-                        element_name=element_name, 
+                        name=beam_variable_name,
+                        element_name=element_name,
                         read_only=True,
                     )
                 )
