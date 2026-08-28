@@ -240,8 +240,20 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
     @initial_particles.setter
     def initial_particles(self, particles: ParticleGroup):
-        """set the initial particle distribution for tracking"""
+        """
+        set the initial particle distribution for tracking
+
+        NOTE: for bmad compatibility, we drift the particles to a fixed z 
+        value and subtract the mean t coordinate from the 
+        particle distribution
+        
+        """
         if self.simulator.tao_global()["track_type"] == "beam":
+            # drift particles to fixed z and subtract mean t coordinate for bmad compatibility
+            particles.drift_to_z()
+            particles.z[:] = 0.0
+            particles.t[:] -= particles["mean_t"]
+
             fname = getcwd() + "/input_beam.h5"
             logger.debug("Setting initial particles from %s", fname)
             particles.write(fname)

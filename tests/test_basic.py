@@ -264,3 +264,18 @@ class TestModel:
         assert not np.all(model._state["mat6"] == 0)
 
         model.reset()
+
+    def test_setting_initial_particles_zeros_z_coordinates(self, model):
+        model.set({"track_type": "beam"})
+        particles = ParticleGroup(TEST_BEAM_PATH)
+
+        # Ensure the input distribution has nonzero z values before setting it.
+        particles.z[:] = np.linspace(-1e-3, 1e-3, particles.n_particle)
+        assert np.any(particles.z != 0.0)
+
+        model.initial_particles = particles
+        input_beam = model.initial_particles
+
+        assert np.all(input_beam.z == 0.0)
+
+        model.reset()
