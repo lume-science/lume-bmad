@@ -71,7 +71,7 @@ class TestModel:
 
         # test that beam is being dumped at the correct locations
         for ele in ["qf", "qd"]:
-            beam = model.get(f"{ele}_beam")
+            beam = model.get([f"{ele}_beam"])[f"{ele}_beam"]
             assert isinstance(beam, ParticleGroup)
             assert beam.n_particle == 1000
 
@@ -144,13 +144,13 @@ class TestModel:
 
     def test_mat6_output(self, model):
         # test that mat6 output variable is being read and has correct shape
-        mat6 = model.get("mat6")
+        mat6 = model.get(["mat6"])["mat6"]
         assert isinstance(mat6, np.ndarray)
         assert mat6.shape == (len(model.tao.lat_list("*", "ele.name")), 6, 6)
 
     def test_vec0_output(self, model):
         # test that vec0 output variable is being read and has correct shape
-        vec0 = model.get("vec0")
+        vec0 = model.get(["vec0"])["vec0"]
         assert isinstance(vec0, np.ndarray)
         assert vec0.shape == (len(model.tao.lat_list("*", "ele.name")), 6)
 
@@ -164,12 +164,12 @@ class TestModel:
 
         # switching back to single-particle mode should clear beam dumps
         model.set({"track_type": "single"})
-        assert model.get("track_type") == "single"
+        assert model.get(["track_type"])["track_type"] == "single"
 
         # In single mode update_state removes the beam dumps from the list of supported variables
         for var in ["qf_beam", "qd_beam"]:
             with pytest.raises(ValueError):
-                model.get(var)
+                model.get([var])
 
         assert model.initial_particles is None
         assert model.final_particles is None
@@ -189,7 +189,7 @@ class TestModel:
         assert expected.issubset(set(supported.keys()))
 
     def test_name_output_uses_object_dtype(self, model):
-        names = model.get("name")
+        names = model.get(["name"])["name"]
         assert isinstance(names, np.ndarray)
         assert names.dtype == object
         assert len(names) == len(model.tao.lat_list("*", "ele.name"))
@@ -213,7 +213,7 @@ class TestModel:
         assert expected.issubset(set(supported.keys()))
 
         # try to get a comb output variable before setting comb_ds_save and check that it is empty
-        comb_output = model.get("x.beta")
+        comb_output = model.get(["x.beta"])["x.beta"]
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 
@@ -225,13 +225,13 @@ class TestModel:
 
         # try to get a comb output -- should raise error since they should no longer be supported
         with pytest.raises(ValueError):
-            model.get("x.beta")
+            model.get(["x.beta"])
 
         # adding an initial beam should update the length of the comb output variables
         model.set({"track_type": "beam"})
         model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
 
-        comb_output = model.get("x.beta")
+        comb_output = model.get(["x.beta"])["x.beta"]
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 
@@ -240,13 +240,11 @@ class TestModel:
     def test_getting_all_variables(self, model):
         variable_names = list(model.supported_variables.keys())
 
-        for name in variable_names:
-            model.get(name)
+        model.get(variable_names)
 
         # run the model in beam tracking mode and then try to get all variables again, including beam variables
         model.set({"track_type": "beam"})
-        for name in model.supported_variables.keys():
-            model.get(name)
+        model.get(list(model.supported_variables.keys()))
         model.reset()
 
     def test_setting_initial_particles_updates_state(self, model):
