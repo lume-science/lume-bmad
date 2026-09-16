@@ -71,7 +71,7 @@ model.set({"qf:B1_GRADIENT": 0.2})
 
 # Enable beam tracking and read a dumped beam distribution
 model.set({"track_type": "beam"})
-qf_beam = model.get("qf_beam")
+qf_beam = model.get_value("qf_beam")
 print(qf_beam.n_particle)
 ```
 
