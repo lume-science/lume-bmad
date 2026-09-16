@@ -1,7 +1,21 @@
-from lume_bmad.actions import CombStatVariable, StatVariable
+from lume_bmad.actions import (
+    CombStatVariable,
+    StatVariable,
+    BmadPMDalpha_x,
+    BmadPMDalpha_y,
+    BmadPMDbeta_x,
+    BmadPMDbeta_y,
+    BmadPMDnorm_emit_x,
+    BmadPMDnorm_emit_y,
+    BmadPMDs,
+    BmadPMDsigma_x,
+    BmadPMDsigma_y,
+    BmadPMDsigma_z,
+)
 import numpy as np
 import yaml
 from lume.variables import ScalarVariable
+from lume.variables.pmd import PMDVariable
 from pytao import Tao
 
 # from lcls_live.datamaps import get_datamaps
@@ -38,20 +52,47 @@ TAO_COMB_OUTPUT_UNITS = {
     "y": "m",
     "py": "rad",
     "t": "s",
+    "x.sigma": "m",
+    "x.sigma_p": "rad",
     "x.beta": "m",
     "x.alpha": "",
     "x.eta": "m",
     "x.etap": "",
     "x.emit": "m*rad",
     "x.norm_emit": "m*rad",
+    "y.sigma": "m",
+    "y.sigma_p": "rad",
     "y.beta": "m",
     "y.alpha": "",
     "y.eta": "m",
     "y.etap": "",
     "y.emit": "m*rad",
     "y.norm_emit": "m*rad",
+    "z.sigma": "m",
+    "z.sigma_p": "rad",
+    "z.beta": "m",
+    "z.alpha": "",
+    "z.eta": "m",
+    "z.etap": "",
+    "z.emit": "m*rad",
+    "z.norm_emit": "m*rad",
+    "t.sigma": "s",
     "n_particle_live": "",
 }
+
+# BmadPMDVariable subclasses backed by comb statistics, in pmd: registration order
+BMAD_PMD_VARIABLE_CLASSES: list[type[PMDVariable]] = [
+    BmadPMDs,
+    BmadPMDbeta_x,
+    BmadPMDbeta_y,
+    BmadPMDalpha_x,
+    BmadPMDalpha_y,
+    BmadPMDnorm_emit_x,
+    BmadPMDnorm_emit_y,
+    BmadPMDsigma_x,
+    BmadPMDsigma_y,
+    BmadPMDsigma_z,
+]
 
 ###############################################################
 # Utility functions for importing control and output variables
@@ -175,6 +216,31 @@ def get_tao_comb_output_variables(tao: Tao) -> list[CombStatVariable]:
                     dtype=np.dtype(float),
                 )
             )
+
+    return out_list
+
+
+def get_tao_pmd_comb_output_variables(tao: Tao) -> list[PMDVariable]:
+    """
+    Returns list of BmadPMDVariable instances (pmd: outputs) for Tao comb outputs.
+
+    Parameters
+    ----------
+    tao: Tao
+        Instance of the Tao class.
+
+    Returns
+    -------
+    list[PMDVariable]
+        A list of PMDVariable instances.
+
+    """
+    out_list = []
+
+    if tao.tao_global()["track_type"] == "beam":
+        shape = tao.bunch_comb("s").shape
+        for cls in BMAD_PMD_VARIABLE_CLASSES:
+            out_list.append(cls(shape=shape))
 
     return out_list
 
