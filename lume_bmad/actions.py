@@ -21,6 +21,8 @@ from lume.variables.pmd import (
     PMDsigma_x,
     PMDsigma_y,
     PMDsigma_z,
+    PMDp,
+    PMDkinetic_energy,
 )
 from pytao import Tao
 
@@ -160,6 +162,16 @@ class BmadPMDsigma_z(_CombStatMixin, PMDsigma_z):
     """Bmad comb-output variable for the longitudinal beam size."""
 
     statistic_name: str = "z.sigma"
+
+class BmadPMDp(_CombStatMixin, PMDp):
+    """Bmad comb-output variable for the beam momentum."""
+
+    statistic_name: str = "p0c"
+
+class BmadPMDkinetic_energy(_CombStatMixin, PMDkinetic_energy):
+    """Bmad comb-output variable for the beam kinetic energy."""
+
+    statistic_name: str = "p0c"
 
 
 class TrackTypeAction(EnumVariable, WritableActionMixin):

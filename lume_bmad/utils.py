@@ -1,4 +1,6 @@
 from lume_bmad.actions import (
+    BmadPMDp,
+    BmadPMDkinetic_energy,
     CombStatVariable,
     StatVariable,
     BmadPMDalpha_x,
@@ -40,7 +42,6 @@ TAO_OUTPUT_UNITS = {
     "b.phi": "",
     "l": "m",
     "e_tot": "eV",
-    "p0c": "eV/c",
     "mat6": "",
     "vec0": "m",
 }
@@ -77,6 +78,7 @@ TAO_COMB_OUTPUT_UNITS = {
     "z.emit": "m*rad",
     "z.norm_emit": "m*rad",
     "t.sigma": "s",
+    "p0c": "eV/c",
     "n_particle_live": "",
 }
 
@@ -92,6 +94,8 @@ BMAD_PMD_VARIABLE_CLASSES: list[type[PMDVariable]] = [
     BmadPMDsigma_x,
     BmadPMDsigma_y,
     BmadPMDsigma_z,
+    BmadPMDp,
+    BmadPMDkinetic_energy,
 ]
 
 ###############################################################
