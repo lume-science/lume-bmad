@@ -8,6 +8,7 @@ from lume_bmad.utils import (
     get_tao_output_variables,
     TAO_COMB_OUTPUT_UNITS,
     get_tao_comb_output_variables,
+    get_tao_pmd_comb_output_variables,
 )
 from lume.actions import ActionModel, ActionVariable
 from lume_bmad.actions import TrackTypeAction, BeamAtElementVariable
@@ -107,10 +108,16 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         if in_beam_mode:
             for variable in get_tao_comb_output_variables(self.simulator):
                 self.register_action_variable(variable)
+            for variable in get_tao_pmd_comb_output_variables(self.simulator):
+                self.register_action_variable(variable)
         else:
             for parameter_name in comb_names:
                 if parameter_name in self.supported_variables:
                     self.unregister_action_variable(parameter_name)
+            for name in [
+                n for n in self.supported_variables if n.startswith("pmd:")
+            ]:
+                self.unregister_action_variable(name)
 
         for element_name in self._dump_locations:
             beam_variable_name = f"{element_name}_beam"

@@ -10,6 +10,20 @@ from lume.variables import (
     EnumVariable,
     ParticleGroupVariable,
 )
+from lume.variables.pmd import (
+    PMDalpha_x,
+    PMDalpha_y,
+    PMDbeta_x,
+    PMDbeta_y,
+    PMDnorm_emit_x,
+    PMDnorm_emit_y,
+    PMDs,
+    PMDsigma_x,
+    PMDsigma_y,
+    PMDsigma_z,
+    PMDp,
+    PMDkinetic_energy,
+)
 from pytao import Tao
 
 import logging
@@ -73,18 +87,91 @@ class StatVariable(NDVariable, ReadOnlyActionMixin):
         return arr
 
 
-class CombStatVariable(NDVariable, ReadOnlyActionMixin):
+class _CombStatMixin:
+    """Shared `_get` for variables backed by a Bmad bunch_comb statistic."""
+
+    def _get(self, simulator: Tao) -> Any:
+        if simulator.tao_global()["track_type"] != "beam":
+            raise ValueError(
+                "Comb statistics can only be read when track_type is 'beam'."
+            )
+        return np.asarray(simulator.bunch_comb(self.statistic_name), dtype=self.dtype)
+
+
+class CombStatVariable(_CombStatMixin, NDVariable, ReadOnlyActionMixin):
     """Action that operates on a single comb statistic in the Bmad model."""
 
     statistic_name: str
 
-    def _get(self, simulator: Tao) -> Any:
-        if simulator.tao_global()["track_type"] == "beam":
-            return simulator.bunch_comb(self.statistic_name)
-        else:
-            raise ValueError(
-                "CombStatVariable can only be used when track_type is 'beam'."
-            )
+
+class BmadPMDs(_CombStatMixin, PMDs):
+    """Bmad comb-output variable for the longitudinal beam position s."""
+
+    statistic_name: str = "s"
+
+
+class BmadPMDbeta_x(_CombStatMixin, PMDbeta_x):
+    """Bmad comb-output variable for the horizontal beta function."""
+
+    statistic_name: str = "x.beta"
+
+
+class BmadPMDbeta_y(_CombStatMixin, PMDbeta_y):
+    """Bmad comb-output variable for the vertical beta function."""
+
+    statistic_name: str = "y.beta"
+
+
+class BmadPMDalpha_x(_CombStatMixin, PMDalpha_x):
+    """Bmad comb-output variable for the horizontal alpha function."""
+
+    statistic_name: str = "x.alpha"
+
+
+class BmadPMDalpha_y(_CombStatMixin, PMDalpha_y):
+    """Bmad comb-output variable for the vertical alpha function."""
+
+    statistic_name: str = "y.alpha"
+
+
+class BmadPMDnorm_emit_x(_CombStatMixin, PMDnorm_emit_x):
+    """Bmad comb-output variable for the horizontal normalized emittance."""
+
+    statistic_name: str = "x.norm_emit"
+
+
+class BmadPMDnorm_emit_y(_CombStatMixin, PMDnorm_emit_y):
+    """Bmad comb-output variable for the vertical normalized emittance."""
+
+    statistic_name: str = "y.norm_emit"
+
+
+class BmadPMDsigma_x(_CombStatMixin, PMDsigma_x):
+    """Bmad comb-output variable for the horizontal beam size."""
+
+    statistic_name: str = "x.sigma"
+
+
+class BmadPMDsigma_y(_CombStatMixin, PMDsigma_y):
+    """Bmad comb-output variable for the vertical beam size."""
+
+    statistic_name: str = "y.sigma"
+
+
+class BmadPMDsigma_z(_CombStatMixin, PMDsigma_z):
+    """Bmad comb-output variable for the longitudinal beam size."""
+
+    statistic_name: str = "z.sigma"
+
+class BmadPMDp(_CombStatMixin, PMDp):
+    """Bmad comb-output variable for the beam momentum."""
+
+    statistic_name: str = "p0c"
+
+class BmadPMDkinetic_energy(_CombStatMixin, PMDkinetic_energy):
+    """Bmad comb-output variable for the beam kinetic energy."""
+
+    statistic_name: str = "p0c"
 
 
 class TrackTypeAction(EnumVariable, WritableActionMixin):
