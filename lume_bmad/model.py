@@ -229,7 +229,7 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
     def initial_particles(self) -> ParticleGroup:
         """initial particle distribution for tracking"""
         if self.simulator.tao_global()["track_type"] == "beam":
-            return self.simulator.particles("BEGINNING")
+            return self.simulator.particles(self.start_element)
         else:
             return None
 
