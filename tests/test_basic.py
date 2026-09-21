@@ -311,6 +311,11 @@ class TestModel:
         assert restored["qf:B1_GRADIENT"] == 0.2
         assert restored["qd:B1_GRADIENT"] == -0.2
 
+        # confirm the underlying Tao simulator was actually rolled back, not
+        # just the model's cached state
+        assert model.tao.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.2
+        assert model.tao.ele_gen_attribs("qd")["B1_GRADIENT"] == -0.2
+
         model.reset()
 
     def test_model_usable_after_recovery(self, model):
