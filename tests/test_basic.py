@@ -277,3 +277,27 @@ class TestModel:
         assert np.all(input_beam.z == 0.0)
 
         model.reset()
+
+    def test_recovery_from_bad_bmad(self, model):
+        model.set({"qf:B1_GRADIENT": 0.2})
+        cached_state = model.get(list(model.supported_variables.keys()))
+
+        # a NaN value passes lume's own validation but is rejected by Tao,
+        # triggering a TaoCommandError inside LUMEBmadModel._set
+        model.set({"qf:B1_GRADIENT": float("nan")})
+
+        # the model should have recovered by restoring the previously cached state
+        restored_state = model.get(list(model.supported_variables.keys()))
+        assert restored_state["qf:B1_GRADIENT"] == cached_state["qf:B1_GRADIENT"]
+        for name, value in cached_state.items():
+            if isinstance(value, np.ndarray):
+                assert np.array_equal(
+                    restored_state[name], value, equal_nan=True
+                )
+            else:
+                assert restored_state[name] == value
+
+        # lattice calculations should be re-enabled after recovering
+        assert model.tao.tao_global()["lattice_calc_on"] is True
+
+        model.reset()

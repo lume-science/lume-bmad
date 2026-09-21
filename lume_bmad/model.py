@@ -3,7 +3,7 @@ import logging
 from beamphysics import ParticleGroup
 from typing import Any
 from lume.staged_model import InitialParticlesMixIn, FinalParticlesMixIn
-from pytao import Tao
+from pytao import Tao, TaoCommandError
 from lume_bmad.utils import (
     get_tao_output_variables,
     TAO_COMB_OUTPUT_UNITS,
@@ -160,21 +160,38 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         # turn tao eager mode off to speed up setting multiple variables
         self.simulator.cmd("set global lattice_calc_on = F")
 
+        # cache values from state for restoring later if needed
+        cached_state = self._state.copy()
+
         # set control variables using their respective set methods
         try:
             super()._set(values)
-        except Exception:
-            logger.error("Error setting variables: %s")
-            raise
-        finally:
             # after setting all variables, turn eager mode back on
             self.simulator.cmd("set global lattice_calc_on = T")
 
-        # track_type toggles the set of supported read-only outputs.
-        self._refresh_dynamic_action_variables()
+            # track_type toggles the set of supported read-only outputs.
+            self._refresh_dynamic_action_variables()
 
-        # update state with new input / output values
-        self.update_state()
+            # update state with new input / output values
+            self.update_state()
+
+        except TaoCommandError as e:
+            logger.error("Error setting variables: %s, restoring cached state. Exception: %s", values, e)
+            # restore cached state in case of error
+            self._state = cached_state
+
+            # get the writable variables from the cached state
+            writable_cached_state = {name: cached_state[name] for name in self.supported_variables if not self.supported_variables[name].read_only}
+
+            # restore the cached state using the parent class method
+            super()._set(writable_cached_state)
+
+            # ensure lattice calculations are turned back on after restoring state
+            self.simulator.cmd("set global lattice_calc_on = T")
+
+
+
+
 
     def register_action_variable(self, variable: ActionVariable) -> None:
         """
