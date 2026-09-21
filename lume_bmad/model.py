@@ -175,13 +175,22 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             # update state with new input / output values
             self.update_state()
 
+        # handle errors specific to Tao commands
         except TaoCommandError as e:
-            logger.error("Error setting variables: %s, restoring cached state. Exception: %s", values, e)
+            logger.error(
+                "Error setting variables: %s, restoring cached state. Exception: %s",
+                values,
+                e,
+            )
             # restore cached state in case of error
             self._state = cached_state
 
             # get the writable variables from the cached state
-            writable_cached_state = {name: cached_state[name] for name in self.supported_variables if not self.supported_variables[name].read_only}
+            writable_cached_state = {
+                name: cached_state[name]
+                for name in self.supported_variables
+                if not self.supported_variables[name].read_only
+            }
 
             # restore the cached state using the parent class method
             super()._set(writable_cached_state)
@@ -189,9 +198,16 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             # ensure lattice calculations are turned back on after restoring state
             self.simulator.cmd("set global lattice_calc_on = T")
 
+            # track_type toggles the set of supported read-only outputs.
+            self._refresh_dynamic_action_variables()
 
+        # handle other errors by re-raising them
+        except Exception as e:
+            logger.error("Unexpected error setting variables: %s", e)
+            # ensure lattice calculations are turned back on after an unexpected error
+            self.simulator.cmd("set global lattice_calc_on = T")
 
-
+            raise
 
     def register_action_variable(self, variable: ActionVariable) -> None:
         """

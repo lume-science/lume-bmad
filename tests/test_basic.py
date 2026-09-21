@@ -291,13 +291,41 @@ class TestModel:
         assert restored_state["qf:B1_GRADIENT"] == cached_state["qf:B1_GRADIENT"]
         for name, value in cached_state.items():
             if isinstance(value, np.ndarray):
-                assert np.array_equal(
-                    restored_state[name], value, equal_nan=True
-                )
+                assert np.array_equal(restored_state[name], value, equal_nan=True)
             else:
                 assert restored_state[name] == value
 
         # lattice calculations should be re-enabled after recovering
         assert model.tao.tao_global()["lattice_calc_on"] is True
+
+        model.reset()
+
+    def test_recovery_from_bad_bmad_is_atomic(self, model):
+        model.set({"qf:B1_GRADIENT": 0.2, "qd:B1_GRADIENT": -0.2})
+
+        # qf is set successfully before qd fails; the whole batch should
+        # still roll back, including the already-applied qf change
+        model.set({"qf:B1_GRADIENT": 0.5, "qd:B1_GRADIENT": float("nan")})
+
+        restored = model.get(["qf:B1_GRADIENT", "qd:B1_GRADIENT"])
+        assert restored["qf:B1_GRADIENT"] == 0.2
+        assert restored["qd:B1_GRADIENT"] == -0.2
+
+        model.reset()
+
+    def test_model_usable_after_recovery(self, model):
+        model.set({"track_type": "beam"})
+
+        # trigger a recovery while in beam-tracking mode
+        model.set({"qf:B1_GRADIENT": float("nan")})
+
+        # the model should still be in beam mode and accept further valid sets
+        assert model.get(["track_type"])["track_type"] == "beam"
+        model.set({"qf:B1_GRADIENT": 0.3})
+        assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.3
+
+        # beam outputs should still be readable after recovering
+        beam = model.get(["qf_beam"])["qf_beam"]
+        assert isinstance(beam, ParticleGroup)
 
         model.reset()
