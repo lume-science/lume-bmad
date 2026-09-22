@@ -12,7 +12,7 @@ from lume_bmad.actions import (
     ScreenResolutionVariable,
     ScreenSpec,
 )
-from lume_bmad.utils import TAO_COMB_OUTPUT_UNITS
+from lume_bmad.utils import TAO_COMB_OUTPUT_NAMES
 from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
@@ -226,29 +226,29 @@ class TestModel:
         # setting track_type to beam should add to the list of expected pvs
         model.set({"track_type": "beam"})
         supported = model.supported_variables
-        expected.update(set(TAO_COMB_OUTPUT_UNITS.keys()))
+        expected.update(TAO_COMB_OUTPUT_NAMES)
         assert expected.issubset(set(supported.keys()))
 
         # try to get a comb output variable before setting comb_ds_save and check that it is empty
-        comb_output = model.get(["x.beta"])["x.beta"]
+        comb_output = model.get(["comb:x.beta"])["comb:x.beta"]
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 
         # setting track_type back to single should remove comb output variables
         model.set({"track_type": "single"})
         supported = model.supported_variables
-        expected.difference_update(set(TAO_COMB_OUTPUT_UNITS.keys()))
+        expected.difference_update(TAO_COMB_OUTPUT_NAMES)
         assert expected.issubset(set(supported.keys()))
 
         # try to get a comb output -- should raise error since they should no longer be supported
         with pytest.raises(ValueError):
-            model.get(["x.beta"])
+            model.get(["comb:x.beta"])
 
         # adding an initial beam should update the length of the comb output variables
         model.set({"track_type": "beam"})
         model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
 
-        comb_output = model.get(["x.beta"])["x.beta"]
+        comb_output = model.get(["comb:x.beta"])["comb:x.beta"]
         assert isinstance(comb_output, np.ndarray)
         assert len(comb_output) == 23
 

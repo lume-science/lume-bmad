@@ -6,7 +6,7 @@ from lume.staged_model import InitialParticlesMixIn, FinalParticlesMixIn
 from pytao import Tao, TaoCommandError
 from lume_bmad.utils import (
     get_tao_output_variables,
-    TAO_COMB_OUTPUT_UNITS,
+    TAO_COMB_OUTPUT_NAMES,
     get_tao_comb_output_variables,
 )
 from lume.actions import ActionModel, ActionVariable
@@ -103,14 +103,14 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """Synchronize comb and dumped-beam action variables with the current track type."""
         in_beam_mode = self.simulator.tao_global()["track_type"] == "beam"
 
-        comb_names = list(TAO_COMB_OUTPUT_UNITS.keys())
+        comb_names = list(TAO_COMB_OUTPUT_NAMES)
         if in_beam_mode:
             for variable in get_tao_comb_output_variables(self.simulator):
                 self.register_action_variable(variable)
         else:
-            for parameter_name in comb_names:
-                if parameter_name in self.supported_variables:
-                    self.unregister_action_variable(parameter_name)
+            for comb_name in comb_names:
+                if comb_name in self.supported_variables:
+                    self.unregister_action_variable(comb_name)
 
         for element_name in self._dump_locations:
             beam_variable_name = f"{element_name}_beam"

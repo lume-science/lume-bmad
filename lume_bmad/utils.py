@@ -1,7 +1,5 @@
 from lume_bmad.actions import CombStatVariable, StatVariable
 import numpy as np
-import yaml
-from lume.variables import ScalarVariable
 from pytao import Tao
 
 # from lcls_live.datamaps import get_datamaps
@@ -53,45 +51,11 @@ TAO_COMB_OUTPUT_UNITS = {
     "n_particle_live": "",
 }
 
+TAO_COMB_OUTPUT_NAMES = {f"comb:{key}" for key in TAO_COMB_OUTPUT_UNITS.keys()}
+
 ###############################################################
 # Utility functions for importing control and output variables
 ################################################################
-
-
-def import_output_variables(output_variable_file: str):
-    """
-    Import output variables from a YAML file and define them as Variable instances.
-    Note that output variables are read-only.
-
-    TODO: move SLAC specific mapping and unit conversions to slac-tools
-
-    Parameters
-    ----------
-    output_variable_file: str
-        Path to the YAML file containing output variable definitions.
-
-    Returns
-    -------
-    dict[str, Variable]
-        Dictionary of output variables mapped by their names.
-    """
-
-    out_dict = {}
-
-    with open(output_variable_file, "r") as file:
-        output_variables = yaml.safe_load(file)
-
-    for ele in output_variables.keys():
-        for attr in output_variables[ele].keys():
-            name = attr.replace("ele", "").replace(".", "_")
-            name = ele + name + "_"
-            out_dict[name] = ScalarVariable(
-                name=name,
-                unit=TAO_OUTPUT_UNITS[attr],
-                read_only=True,
-            )
-
-    return out_dict
 
 
 def get_tao_stat_output_variables(tao: Tao) -> list[StatVariable]:
@@ -167,7 +131,7 @@ def get_tao_comb_output_variables(tao: Tao) -> list[CombStatVariable]:
         for parameter_name in TAO_COMB_OUTPUT_UNITS.keys():
             out_list.append(
                 CombStatVariable(
-                    name=parameter_name,
+                    name=f"comb:{parameter_name}",
                     statistic_name=parameter_name,
                     shape=shape,
                     unit=TAO_COMB_OUTPUT_UNITS[parameter_name],
