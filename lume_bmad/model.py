@@ -201,6 +201,8 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             # track_type toggles the set of supported read-only outputs.
             self._refresh_dynamic_action_variables()
 
+            raise e
+
         # handle other errors by re-raising them
         except Exception as e:
             logger.error("Unexpected error setting variables: %s", e)
@@ -329,5 +331,9 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             for name in control_variable_names
             if not isinstance(self.supported_variables[name], BeamAtElementVariable)
         }
+
+        # remove the track_type from the initial control state if it exists
+        if "track_type" in initial_control_state:
+            del initial_control_state["track_type"]
 
         self.set(initial_control_state)
