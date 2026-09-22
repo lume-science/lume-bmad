@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import os
 from pathlib import Path
-from pytao import Tao
+from pytao import Tao, TaoCommandError
 
 from lume_bmad.model import LUMEBmadModel
 from lume_bmad.actions import (
@@ -176,6 +176,23 @@ class TestModel:
 
         model.reset()
 
+    def test_reset_maintains_current_tracking_mode(self, model):
+        # model starts in single-particle tracking mode by default
+        assert model.get(["track_type"])["track_type"] == "single"
+
+        # switch to beam tracking mode and reset the model
+        model.set({"track_type": "beam"})
+        model.reset()
+
+        # reset should not revert track_type back to its initial value
+        assert model.get(["track_type"])["track_type"] == "beam"
+
+        # switch back to single-particle mode and reset again
+        model.set({"track_type": "single"})
+        model.reset()
+
+        assert model.get(["track_type"])["track_type"] == "single"
+
     def test_supported_variables_contains_model_interfaces(self, model):
         supported = model.supported_variables
         expected = {
@@ -275,5 +292,65 @@ class TestModel:
         input_beam = model.initial_particles
 
         assert np.all(input_beam.z == 0.0)
+
+        model.reset()
+
+    def test_recovery_from_bad_bmad(self, model):
+        model.set({"qf:B1_GRADIENT": 0.2})
+        cached_state = model.get(list(model.supported_variables.keys()))
+
+        # a NaN value passes lume's own validation but is rejected by Tao,
+        # triggering a TaoCommandError inside LUMEBmadModel._set
+        with pytest.raises(TaoCommandError):
+            model.set({"qf:B1_GRADIENT": float("nan")})
+
+        # the model should have recovered by restoring the previously cached state
+        restored_state = model.get(list(model.supported_variables.keys()))
+        assert restored_state["qf:B1_GRADIENT"] == cached_state["qf:B1_GRADIENT"]
+        for name, value in cached_state.items():
+            if isinstance(value, np.ndarray):
+                assert np.array_equal(restored_state[name], value, equal_nan=True)
+            else:
+                assert restored_state[name] == value
+
+        # lattice calculations should be re-enabled after recovering
+        assert model.tao.tao_global()["lattice_calc_on"] is True
+
+        model.reset()
+
+    def test_recovery_from_bad_bmad_is_atomic(self, model):
+        model.set({"qf:B1_GRADIENT": 0.2, "qd:B1_GRADIENT": -0.2})
+
+        # qf is set successfully before qd fails; the whole batch should
+        # still roll back, including the already-applied qf change
+        with pytest.raises(TaoCommandError):
+            model.set({"qf:B1_GRADIENT": 0.5, "qd:B1_GRADIENT": float("nan")})
+
+        restored = model.get(["qf:B1_GRADIENT", "qd:B1_GRADIENT"])
+        assert restored["qf:B1_GRADIENT"] == 0.2
+        assert restored["qd:B1_GRADIENT"] == -0.2
+
+        # confirm the underlying Tao simulator was actually rolled back, not
+        # just the model's cached state
+        assert model.tao.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.2
+        assert model.tao.ele_gen_attribs("qd")["B1_GRADIENT"] == -0.2
+
+        model.reset()
+
+    def test_model_usable_after_recovery(self, model):
+        model.set({"track_type": "beam"})
+
+        # trigger a recovery while in beam-tracking mode
+        with pytest.raises(TaoCommandError):
+            model.set({"qf:B1_GRADIENT": float("nan")})
+
+        # the model should still be in beam mode and accept further valid sets
+        assert model.get(["track_type"])["track_type"] == "beam"
+        model.set({"qf:B1_GRADIENT": 0.3})
+        assert model.get(["qf:B1_GRADIENT"])["qf:B1_GRADIENT"] == 0.3
+
+        # beam outputs should still be readable after recovering
+        beam = model.get(["qf_beam"])["qf_beam"]
+        assert isinstance(beam, ParticleGroup)
 
         model.reset()
