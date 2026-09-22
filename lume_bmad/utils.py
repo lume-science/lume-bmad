@@ -200,20 +200,37 @@ def get_tao_output_variables(tao: Tao) -> list[StatVariable | CombStatVariable]:
     ]
 
 
-def rmat_get(tao, element_a, element_b, design=False):
+def rmat_get(tao, start, end, design=False, include_start=True, include_end=True):
     """
-    Returns dictionary with Rmat from a to b
+    Returns dictionary with Rmat from start to end
 
     Parameters
     ----------
     tao: Tao
         Instance of the Tao class.
+    start: str
+        Starting element for the Rmat calculation.
+    end: str
+        Ending element for the Rmat calculation.
+    design: bool, optional
+        If True, use the design values for the elements. Default is False.
+    include_start: bool, optional
+        If True, include the starting element in the Rmat calculation. Default is True.
+    include_end: bool, optional
+        If True, include the ending element in the Rmat calculation. Default is True.
 
     Returns
     -------
-    array (6,6) containing Rmat
+    array (6,6) containing Rmat from start to end
 
     """
+    if not include_start:
+        element_list = tao.lat_list("*", "ele.name")
+        start = element_list[element_list.index(start) + 1]
+    if not include_end:
+        element_list = tao.lat_list("*", "ele.name")
+        end = element_list[element_list.index(end) - 1]
+
     if design:
-        element_a = element_a + "|design"
-    return tao.matrix(element_a, element_b)["mat6"]
+        start = start + "|design"
+    return tao.matrix(start, end)["mat6"]
