@@ -4,8 +4,6 @@ import yaml
 from lume.variables import ScalarVariable
 from pytao import Tao
 
-# from lcls_live.datamaps import get_datamaps
-
 
 TAO_OUTPUT_UNITS = {
     "name": "",
