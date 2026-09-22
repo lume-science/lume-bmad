@@ -1,7 +1,5 @@
 from lume_bmad.actions import CombStatVariable, StatVariable
 import numpy as np
-import yaml
-from lume.variables import ScalarVariable
 from pytao import Tao
 
 # from lcls_live.datamaps import get_datamaps

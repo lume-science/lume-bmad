@@ -12,7 +12,7 @@ from lume_bmad.actions import (
     ScreenResolutionVariable,
     ScreenSpec,
 )
-from lume_bmad.utils import TAO_COMB_OUTPUT_NAMES, TAO_COMB_OUTPUT_UNITS
+from lume_bmad.utils import TAO_COMB_OUTPUT_NAMES
 from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
