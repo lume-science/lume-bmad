@@ -659,7 +659,9 @@ class TestModel:
             assert np.isnan(node[()]).all()
             assert node.shape == getattr(variable, "shape", ())
             assert node.attrs["error"] == "RuntimeError: test variable read failure"
-            assert node.attrs["variable_class"] == type(variable).__name__
+            assert node.attrs["variable_type"] == (
+                f"{type(variable).__module__}.{type(variable).__qualname__}"
+            )
             assert "error" not in archive["variables/qd:B1_GRADIENT"].attrs
             assert archive["variables/qd:B1_GRADIENT"][()] == -0.2
         assert model._state[failed_name] is cached
