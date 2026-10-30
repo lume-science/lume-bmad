@@ -1,10 +1,11 @@
-from os import getcwd
 import logging
+from pathlib import Path
 from beamphysics import ParticleGroup
 from typing import Any
 from lume.staged_model import InitialParticlesMixIn, FinalParticlesMixIn
 from pytao import Tao, TaoCommandError
 from lume_bmad.utils import (
+    archive_model,
     get_tao_output_variables,
     TAO_COMB_OUTPUT_NAMES,
     get_tao_comb_output_variables,
@@ -278,9 +279,13 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """
         set the initial particle distribution for tracking
 
-        NOTE: for bmad compatibility, we drift the particles to a fixed z
+        NOTES: for bmad compatibility, we drift the particles to a fixed z
         value and subtract the mean t coordinate from the
         particle distribution
+
+        The initial-particle file is managed by PyTao for this session. Beam
+        mode must already be selected; lattice calculations may be paused
+        during assignment and are enabled once the new particles are installed.
 
         """
         if self.simulator.tao_global()["track_type"] == "beam":
@@ -289,19 +294,14 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             particles.z[:] = 0.0
             particles.t[:] -= particles["mean_t"]
 
-            fname = getcwd() + "/input_beam.h5"
-            logger.debug("Setting initial particles from %s", fname)
-            particles.write(fname)
-            self.simulator.cmd(f"set beam_init position_file = {fname}")
+            self.simulator.set_initial_particles(particles)
 
             # after setting the initial particles, we need to update the comb variables
             # and the model state to reflect the new particle distribution and any changes to output
             # variables that depend on the input beam
             self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
-            self._refresh_dynamic_action_variables()
-
-            # update the model state
-            self.update_state()
+            # PyTao installs the beam in single-particle mode; resume tracking.
+            self.set({"track_type": "beam"})
         else:
             raise ValueError(
                 "Cannot set initial_particles when track_type is not 'beam'"
@@ -337,3 +337,16 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             del initial_control_state["track_type"]
 
         self.set(initial_control_state)
+
+    def archive(
+        self, archive_path: str | Path, *, include_variable_values: bool = True
+    ) -> Path:
+        """Write the current model state to a single HDF5 file.
+
+        Set ``include_variable_values=False`` to keep variable metadata without
+        reading or storing current values. See ``lume_bmad.utils.archive_model``
+        for the archive format and behavior.
+        """
+        return archive_model(
+            self, archive_path, include_variable_values=include_variable_values
+        )

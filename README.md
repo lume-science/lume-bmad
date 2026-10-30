@@ -76,3 +76,23 @@ print(qf_beam.n_particle)
 ```
 
 If you want to run this example from outside the repository, copy both fixture files together and pass the path to that copied `fodo.init`.
+
+## Archiving and restoring
+
+```python
+from lume_bmad.archive import read_archive_variables
+from lume_bmad.utils import tao_from_archive
+
+model.archive("model.h5")
+frame = read_archive_variables("model.h5")
+print(frame.attrs["errors"])  # Failed variable names mapped to saved errors.
+tao = tao_from_archive("model.h5")
+```
+
+To skip reading and storing current variable values while retaining names and
+all descriptor metadata (including defaults):
+
+```python
+model.archive("model.h5", include_variable_values=False)
+# Also supported: archive_model(model, "model.h5", include_variable_values=False)
+```
