@@ -23,8 +23,10 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
+    "h5py",
     "lume-base",
     "openpmd-beamphysics",
+    "pandas",
 ]
 
 [project.urls]

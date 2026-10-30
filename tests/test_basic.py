@@ -1,10 +1,13 @@
 import pytest
 import numpy as np
+import h5py
 import os
+import gc
 from pathlib import Path
 from pytao import Tao, TaoCommandError
 
 from lume_bmad.model import LUMEBmadModel
+from lume_bmad.archive import read_archive_variables
 from lume_bmad.actions import (
     EleScalarVariable,
     ScreenImageShapeVariable,
@@ -12,7 +15,7 @@ from lume_bmad.actions import (
     ScreenResolutionVariable,
     ScreenSpec,
 )
-from lume_bmad.utils import TAO_COMB_OUTPUT_NAMES
+from lume_bmad.utils import TAO_COMB_OUTPUT_NAMES, archive_model, tao_from_archive
 from beamphysics import ParticleGroup
 
 TEST_BEAM_PATH = os.path.join(Path(__file__).parent, "test_beam.h5")
@@ -295,6 +298,32 @@ class TestModel:
 
         model.reset()
 
+    def test_setting_initial_particles_before_first_beam_track(
+        self, model, tmp_path, monkeypatch
+    ):
+        workdir = tmp_path / "directory with spaces"
+        workdir.mkdir()
+        monkeypatch.chdir(workdir)
+        model.tao.cmd("set global lattice_calc_on = F")
+        model.tao.cmd("set beam_init position_file = /missing/old_beam.h5")
+        model.tao.cmd("set global track_type = beam")
+        p0c = model.tao.ele_gen_attribs("BEGINNING")["P0C"]
+        particles = ParticleGroup(
+            data=dict(
+                x=[0.0], y=[0.0], z=[0.0], t=[0.0],
+                px=[0.0], py=[0.0], pz=[p0c],
+                weight=[5e-12], status=[1], species="electron",
+            )
+        )
+        model.initial_particles = particles
+        assert model.tao.tao_global()["track_type"] == "beam"
+        assert model.tao.tao_global()["lattice_calc_on"]
+        assert model.initial_particles.n_particle == 1
+        assert model.final_particles.n_particle == 1
+        assert model.get_value("qf_beam").n_particle == 1
+        assert not (workdir / "input_beam.h5").exists()
+        assert Path(model.tao.beam_init(0)["position_file"]).is_file()
+
     def test_recovery_from_bad_bmad(self, model):
         model.set({"qf:B1_GRADIENT": 0.2})
         cached_state = model.get(list(model.supported_variables.keys()))
@@ -354,3 +383,386 @@ class TestModel:
         assert isinstance(beam, ParticleGroup)
 
         model.reset()
+
+    def test_archive(self, model):
+        model.set({"track_type": "beam"})
+        # Keep a persistent example archive for inspection after this test.
+        archive_path = Path.home() / "lume-bmad-archives" / "model.h5"
+        assert model.archive(archive_path) == archive_path
+        with h5py.File(archive_path, "r") as archive:
+            assert "run_tao.lat.pals.yaml" not in archive
+            assert (
+                ParticleGroup(h5=archive["initial_particles"])
+                == model.initial_particles
+            )
+            assert ParticleGroup(h5=archive["final_particles"]) == model.final_particles
+        frame = read_archive_variables(archive_path)
+        assert frame["name"].tolist() == list(model.supported_variables)
+
+    def test_tao_from_archive(self, model, tmp_path):
+        model.set({"track_type": "beam", "qf:B1_GRADIENT": 0.3})
+        expected_initial = model.initial_particles
+        expected_final = model.final_particles
+        expected_beam = model.tao.beam(0)
+        archive_path = model.archive(tmp_path / "archive with spaces" / "model.h5")
+        with h5py.File(archive_path, "r+") as archive:
+            commands = archive["run_tao.cmd"].asstr()[()]
+            commands = "\n".join(
+                "set beam_init position_file = /missing/old_particles.h5"
+                if line.startswith("set beam_init position_file =")
+                else line
+                for line in commands.splitlines()
+            )
+            archive["run_tao.cmd"][()] = commands
+
+        restored = tao_from_archive(archive_path)
+        assert restored.tao_global()["track_type"] == "beam"
+        assert restored.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.3
+        for key in ("track_start", "track_end", "saved_at", "comb_ds_save"):
+            assert restored.beam(0)[key] == expected_beam[key]
+        particle_file = Path(restored.beam_init(0)["position_file"])
+        assert particle_file.exists()
+        assert ParticleGroup(particle_file) == expected_initial
+        archive_path.unlink()
+        restored.cmd("set global track_type = single")
+        restored.cmd("set global track_type = beam")
+        for actual, expected in (
+            (restored.get_initial_particles(), expected_initial),
+            (restored.particles("END"), expected_final),
+        ):
+            assert actual.n_particle == expected.n_particle
+            assert actual.species == expected.species
+            for key in ("x", "px", "y", "py", "z", "pz", "t", "weight"):
+                np.testing.assert_allclose(
+                    actual[key], expected[key], rtol=1e-9, atol=1e-12
+                )
+        del restored
+        gc.collect()
+        assert not particle_file.parent.exists()
+
+    def test_tao_from_archive_requires_initial_particles(self, model, tmp_path):
+        model.set({"track_type": "single"})
+        archive_path = model.archive(tmp_path / "single.h5")
+        with pytest.raises(
+            ValueError, match="missing required entry 'initial_particles'"
+        ):
+            tao_from_archive(archive_path)
+
+    def test_tao_from_archive_cleans_up_on_command_error(
+        self, model, tmp_path, monkeypatch
+    ):
+        model.set({"track_type": "beam"})
+        archive_path = model.archive(tmp_path / "invalid_command.h5")
+        with h5py.File(archive_path, "r+") as archive:
+            archive["run_tao.cmd"][()] = "set global invalid_archive_setting = 1"
+        monkeypatch.setattr("tempfile.tempdir", str(tmp_path))
+        with pytest.raises(TaoCommandError):
+            tao_from_archive(archive_path)
+        assert not list(tmp_path.glob("lume-bmad-restore-*"))
+
+    @pytest.mark.parametrize("track_type", ["single", "beam"])
+    @pytest.mark.parametrize("writer", [archive_model, LUMEBmadModel.archive])
+    def test_archive_round_trip(self, model, tmp_path, monkeypatch, track_type, writer):
+        gradient = model.supported_variables["qf:B1_GRADIENT"]
+        gradient.description = "Quadrupole gradient"
+        gradient.value_range = (-0.5, 0.5)
+        gradient.default_value = 0.2
+        gradient.default_validation_config = "warn"
+        matrix = model.supported_variables["mat6"]
+        matrix.default_value = np.zeros(matrix.shape, dtype=matrix.dtype)
+        model.set({"track_type": track_type, "qf:B1_GRADIENT": 0.3})
+        model.tao.cmd("set ele qf B1_GRADIENT = 0.4")
+        expected = {
+            name: variable._get(model.tao)
+            for name, variable in model.supported_variables.items()
+        }
+        initial_particles = model.initial_particles
+        final_particles = model.final_particles
+        scripts = {}
+        staging_paths = []
+        tao_archive = model.tao.archive
+        tao_cmd = model.tao.cmd
+
+        def capture_archive(directory):
+            staging_paths.append(Path(directory))
+            result = tao_archive(directory)
+            for name in ("run_tao.cmd", "run_tao.lat.bmad", "run_tao.sh"):
+                scripts[name] = (Path(directory) / name).read_text()
+            return result
+
+        def capture_cmd(command, *args, **kwargs):
+            assert not command.startswith("write pals")
+            return tao_cmd(command, *args, **kwargs)
+
+        monkeypatch.setattr(model.tao, "archive", capture_archive)
+        monkeypatch.setattr(model.tao, "cmd", capture_cmd)
+        archive_path = tmp_path / "archive with spaces" / "model.h5"
+        assert writer(model, archive_path) == archive_path
+        assert list(archive_path.parent.iterdir()) == [archive_path]
+        assert all(not path.exists() for path in staging_paths)
+        assert set(scripts) == {
+            "run_tao.cmd",
+            "run_tao.lat.bmad",
+            "run_tao.sh",
+        }
+
+        with h5py.File(archive_path, "r") as archive:
+            assert archive.attrs["archive_version"] == 2
+            assert list(archive["variables"]) == list(expected)
+            assert archive["variables/qf:B1_GRADIENT"][()] == 0.4
+            assert archive["variables/track_type"].asstr()[()] == track_type
+            for node in archive["variables"].values():
+                variable = model.supported_variables[node.attrs["name"]]
+                variable_type = type(variable)
+                assert node.attrs["variable_type"] == (
+                    f"{variable_type.__module__}.{variable_type.__qualname__}"
+                )
+                assert "metadata" not in node.attrs
+                for field, value in variable.model_dump(mode="json").items():
+                    if value is None:
+                        assert isinstance(node.attrs[field], h5py.Empty)
+                    else:
+                        np.testing.assert_equal(node.attrs[field], value)
+            gradient_metadata = archive["variables/qf:B1_GRADIENT"].attrs
+            np.testing.assert_array_equal(gradient_metadata["value_range"], [-0.5, 0.5])
+            assert gradient_metadata["default_value"] == 0.2
+            assert gradient_metadata["default_validation_config"] == "warn"
+            matrix_metadata = archive["variables/mat6"].attrs
+            np.testing.assert_array_equal(matrix_metadata["shape"], matrix.shape)
+            assert matrix_metadata["dtype"] == matrix.dtype.name
+            np.testing.assert_array_equal(
+                matrix_metadata["default_value"], matrix.default_value
+            )
+            expected_keys = set(scripts) | {"variables"}
+            if track_type == "beam":
+                assert (
+                    ParticleGroup(h5=archive["variables/qf_beam"])
+                    == expected["qf_beam"]
+                )
+                expected_keys |= {"initial_particles", "final_particles"}
+                assert (
+                    ParticleGroup(h5=archive["initial_particles"]) == initial_particles
+                )
+                assert ParticleGroup(h5=archive["final_particles"]) == final_particles
+            assert set(archive) == expected_keys
+            for name, content in scripts.items():
+                assert archive[name].asstr()[()] == content
+                assert content
+
+        frame = read_archive_variables(archive_path)
+        assert list(frame.columns) == ["name", "value"]
+        assert frame["name"].tolist() == list(expected)
+        for name, actual in frame.itertuples(index=False, name=None):
+            value = expected[name]
+            if isinstance(value, ParticleGroup):
+                assert actual == value
+            else:
+                np.testing.assert_equal(actual, value)
+                if isinstance(value, np.ndarray):
+                    assert actual.dtype == value.dtype
+        assert model.get_value("track_type") == track_type
+        assert model.get_value("qf:B1_GRADIENT") == 0.4
+
+    @pytest.mark.parametrize("writer", [archive_model, LUMEBmadModel.archive])
+    @pytest.mark.parametrize("track_type", ["single", "beam"])
+    def test_archive_without_variable_values(
+        self, model, tmp_path, monkeypatch, writer, track_type
+    ):
+        model.set({"track_type": track_type, "qf:B1_GRADIENT": 0.3})
+        initial = model.initial_particles
+        final = model.final_particles
+        archive_path = model.archive(tmp_path / "metadata_only.h5")
+        cached = model._state.copy()
+
+        def unexpected_read(*args, **kwargs):
+            pytest.fail("Variable values must not be read or validated")
+
+        for variable_type in {type(var) for var in model.supported_variables.values()}:
+            monkeypatch.setattr(variable_type, "_get", unexpected_read)
+            monkeypatch.setattr(variable_type, "validate_value", unexpected_read)
+
+        assert (
+            writer(model, archive_path, include_variable_values=False) == archive_path
+        )
+        assert model._state.keys() == cached.keys()
+        assert all(model._state[name] is value for name, value in cached.items())
+        with h5py.File(archive_path, "r") as archive:
+            assert list(archive["variables"]) == list(model.supported_variables)
+            for node in archive["variables"].values():
+                assert isinstance(node, h5py.Group)
+                assert len(node) == 0
+                assert node.attrs["kind"] == "omitted"
+                assert "error" not in node.attrs
+                variable = model.supported_variables[node.attrs["name"]]
+                assert node.attrs["variable_type"] == (
+                    f"{type(variable).__module__}.{type(variable).__qualname__}"
+                )
+                for name, value in variable.model_dump(mode="json").items():
+                    if value is None:
+                        assert isinstance(node.attrs[name], h5py.Empty)
+                    else:
+                        np.testing.assert_equal(node.attrs[name], value)
+            for name in ("run_tao.cmd", "run_tao.sh", "run_tao.lat.bmad"):
+                assert archive[name].asstr()[()]
+            if track_type == "beam":
+                assert ParticleGroup(h5=archive["initial_particles"]) == initial
+                assert ParticleGroup(h5=archive["final_particles"]) == final
+            else:
+                assert "initial_particles" not in archive
+                assert "final_particles" not in archive
+        frame = read_archive_variables(archive_path)
+        assert frame["value"].isna().all()
+        assert frame["name"].tolist() == list(model.supported_variables)
+        assert frame.attrs["errors"] == {}
+        assert frame.attrs["omitted_values"] == list(model.supported_variables)
+        if track_type == "beam":
+            restored = tao_from_archive(archive_path)
+            assert restored.tao_global()["track_type"] == "beam"
+            assert restored.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.3
+            assert restored.get_initial_particles().n_particle == initial.n_particle
+
+    def test_archive_preserves_existing_file_on_failure(
+        self, model, tmp_path, monkeypatch
+    ):
+        archive_path = tmp_path / "model.h5"
+        archive_path.write_bytes(b"existing archive")
+
+        def fail_write(group, values):
+            raise OSError("Unable to write variable snapshot")
+
+        monkeypatch.setattr("lume_bmad.utils._write_variables", fail_write)
+        with pytest.raises(OSError, match="Unable to write variable snapshot"):
+            model.archive(archive_path)
+        assert archive_path.read_bytes() == b"existing archive"
+        assert list(tmp_path.iterdir()) == [archive_path]
+
+    @pytest.mark.parametrize(
+        "failed_name",
+        ["qf:B1_GRADIENT", "mat6", "ix_ele", "name", "track_type", "qf_beam"],
+    )
+    def test_archive_variable_read_failure(
+        self, model, tmp_path, monkeypatch, caplog, failed_name
+    ):
+        model.set({"track_type": "beam", "qf:B1_GRADIENT": 0.3, "qd:B1_GRADIENT": -0.2})
+        variable = model.supported_variables[failed_name]
+        cached = model._state[failed_name]
+        original_get = type(variable)._get
+
+        def fail_get(self, simulator):
+            if self.name == failed_name:
+                raise RuntimeError("test variable read failure")
+            return original_get(self, simulator)
+
+        monkeypatch.setattr(type(variable), "_get", fail_get)
+        archive_path = model.archive(tmp_path / "partial.h5")
+        with h5py.File(archive_path, "r") as archive:
+            node = archive["variables"][failed_name]
+            assert np.isnan(node[()]).all()
+            assert node.shape == getattr(variable, "shape", ())
+            assert node.attrs["error"] == "RuntimeError: test variable read failure"
+            assert node.attrs["variable_class"] == type(variable).__name__
+            assert "error" not in archive["variables/qd:B1_GRADIENT"].attrs
+            assert archive["variables/qd:B1_GRADIENT"][()] == -0.2
+        assert model._state[failed_name] is cached
+        assert f"Unable to read archive variable {failed_name}" in caplog.text
+        frame = read_archive_variables(archive_path)
+        assert frame.attrs["errors"] == {
+            failed_name: "RuntimeError: test variable read failure"
+        }
+        assert np.isnan(frame.set_index("name").at[failed_name, "value"]).all()
+        with pytest.warns(UserWarning, match="test variable read failure"):
+            restored = tao_from_archive(archive_path)
+        assert restored.tao_global()["track_type"] == "beam"
+        assert restored.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.3
+        assert restored.get_initial_particles().n_particle == 1000
+
+    def test_archive_variable_validation_failure(self, model, tmp_path, monkeypatch):
+        original_get = EleScalarVariable._get
+
+        def invalid_get(self, simulator):
+            if self.name == "qf:B1_GRADIENT":
+                return "not a number"
+            return original_get(self, simulator)
+
+        monkeypatch.setattr(EleScalarVariable, "_get", invalid_get)
+        archive_path = model.archive(tmp_path / "invalid_value.h5")
+        with h5py.File(archive_path, "r") as archive:
+            node = archive["variables/qf:B1_GRADIENT"]
+            assert np.isnan(node[()])
+            assert node.attrs["error"].startswith("TypeError:")
+
+    @pytest.mark.parametrize(
+        "failed_names",
+        [
+            ("initial_particles",),
+            ("final_particles",),
+            ("initial_particles", "final_particles"),
+        ],
+    )
+    def test_archive_particle_read_failure(
+        self, model, tmp_path, monkeypatch, caplog, failed_names
+    ):
+        model.set({"track_type": "beam", "qf:B1_GRADIENT": 0.2})
+
+        def fail_particles(self):
+            raise RuntimeError("test particle read failure")
+
+        for name in failed_names:
+            monkeypatch.setattr(LUMEBmadModel, name, property(fail_particles))
+        archive_path = model.archive(tmp_path / "partial_particles.h5")
+        with h5py.File(archive_path, "r") as archive:
+            for name in failed_names:
+                assert np.isnan(archive[name][()])
+                assert archive[name].attrs["error"] == (
+                    "RuntimeError: test particle read failure"
+                )
+                assert f"Unable to read archive distribution {name}" in caplog.text
+        with pytest.warns(UserWarning, match="test particle read failure"):
+            restored = tao_from_archive(archive_path)
+        if "initial_particles" in failed_names:
+            assert restored.tao_global()["track_type"] == "single"
+            assert restored.beam_init(0)["position_file"] == ""
+        else:
+            assert restored.tao_global()["track_type"] == "beam"
+            assert restored.get_initial_particles().n_particle == 1000
+        assert restored.ele_gen_attribs("qf")["B1_GRADIENT"] == 0.2
+
+    def test_archive_preserves_existing_file_on_metadata_failure(
+        self, model, tmp_path, monkeypatch
+    ):
+        archive_path = tmp_path / "model.h5"
+        archive_path.write_bytes(b"existing archive")
+
+        def fail_serialization(self, **kwargs):
+            raise TypeError("Unable to serialize variable metadata")
+
+        monkeypatch.setattr(EleScalarVariable, "model_dump", fail_serialization)
+        with pytest.raises(TypeError, match="Unable to serialize variable metadata"):
+            model.archive(archive_path)
+        assert archive_path.read_bytes() == b"existing archive"
+        assert list(tmp_path.iterdir()) == [archive_path]
+
+    @pytest.mark.parametrize("missing", ["initial_particles", "final_particles"])
+    def test_archive_with_one_distribution(self, model, tmp_path, monkeypatch, missing):
+        model.set({"track_type": "beam"})
+        monkeypatch.setattr(LUMEBmadModel, missing, property(lambda self: None))
+        archive_path = model.archive(tmp_path / "model.h5")
+        available = (
+            "final_particles" if missing == "initial_particles" else "initial_particles"
+        )
+        with h5py.File(archive_path, "r") as archive:
+            assert missing not in archive
+            assert ParticleGroup(h5=archive[available]) == getattr(model, available)
+
+    def test_archive_replaces_existing_snapshot(self, model, tmp_path):
+        model.set({"track_type": "beam"})
+        archive_path = model.archive(tmp_path / "model.h5")
+        model.set({"track_type": "single"})
+        assert model.archive(str(archive_path)) == archive_path
+        with h5py.File(archive_path, "r") as archive:
+            assert "initial_particles" not in archive
+            assert "final_particles" not in archive
+        frame = read_archive_variables(archive_path).set_index("name")
+        assert frame.at["track_type", "value"] == "single"
+        assert "qf_beam" not in frame.index
+        assert list(tmp_path.iterdir()) == [archive_path]
