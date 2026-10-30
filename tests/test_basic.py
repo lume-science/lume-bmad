@@ -384,10 +384,9 @@ class TestModel:
 
         model.reset()
 
-    def test_archive(self, model):
+    def test_archive(self, model, tmp_path):
         model.set({"track_type": "beam"})
-        # Keep a persistent example archive for inspection after this test.
-        archive_path = Path.home() / "lume-bmad-archives" / "model.h5"
+        archive_path = tmp_path / "model.h5"
         assert model.archive(archive_path) == archive_path
         with h5py.File(archive_path, "r") as archive:
             assert "run_tao.lat.pals.yaml" not in archive
