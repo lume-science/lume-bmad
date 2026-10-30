@@ -215,6 +215,21 @@ class TestModel:
         assert len(names) == len(model.tao.lat_list("*", "ele.name"))
 
     def test_comb_ds_save_setting(self, model):
+        def assert_comb_matches_tao():
+            name = "comb:x.beta"
+            actual = model.get([name])[name]
+            expected = model.tao.bunch_comb("x.beta")
+
+            assert isinstance(actual, np.ndarray)
+            assert actual.ndim == 1
+            assert actual.size > 0
+            assert actual.shape == expected.shape
+            np.testing.assert_allclose(actual, expected)
+            assert tuple(model.supported_variables[name].shape) == actual.shape
+            assert model.tao.beam(0)["comb_ds_save"] == pytest.approx(
+                model.comb_ds_save
+            )
+
         supported = model.supported_variables
         expected = {
             "qf:B1_GRADIENT",
@@ -232,30 +247,46 @@ class TestModel:
         expected.update(TAO_COMB_OUTPUT_NAMES)
         assert expected.issubset(set(supported.keys()))
 
-        # try to get a comb output variable before setting comb_ds_save and check that it is empty
-        comb_output = model.get(["comb:x.beta"])["comb:x.beta"]
-        assert isinstance(comb_output, np.ndarray)
-        assert len(comb_output) == 23
+        assert_comb_matches_tao()
 
         # setting track_type back to single should remove comb output variables
         model.set({"track_type": "single"})
         supported = model.supported_variables
         expected.difference_update(TAO_COMB_OUTPUT_NAMES)
         assert expected.issubset(set(supported.keys()))
+        assert set(TAO_COMB_OUTPUT_NAMES).isdisjoint(supported)
 
         # try to get a comb output -- should raise error since they should no longer be supported
         with pytest.raises(ValueError):
             model.get(["comb:x.beta"])
 
-        # adding an initial beam should update the length of the comb output variables
+        # Particle replacement must keep comb values and shapes synchronized with Tao.
         model.set({"track_type": "beam"})
         model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
 
-        comb_output = model.get(["comb:x.beta"])["comb:x.beta"]
-        assert isinstance(comb_output, np.ndarray)
-        assert len(comb_output) == 23
+        assert_comb_matches_tao()
 
         model.reset()
+
+    @pytest.mark.parametrize("sample_counts", [(3, 7), (7, 3)])
+    def test_initial_particles_refresh_comb_shapes(
+        self, model, monkeypatch, sample_counts
+    ):
+        samples = np.linspace(0.0, 2.5, sample_counts[0])
+        monkeypatch.setattr(
+            model.tao, "bunch_comb", lambda statistic_name: samples.copy()
+        )
+        model.set({"track_type": "beam"})
+        for name in TAO_COMB_OUTPUT_NAMES:
+            assert tuple(model.supported_variables[name].shape) == samples.shape
+            np.testing.assert_array_equal(model.get([name])[name], samples)
+
+        samples = np.linspace(0.0, 2.5, sample_counts[1])
+        model.initial_particles = ParticleGroup(TEST_BEAM_PATH)
+
+        for name in TAO_COMB_OUTPUT_NAMES:
+            assert tuple(model.supported_variables[name].shape) == samples.shape
+            np.testing.assert_array_equal(model.get([name])[name], samples)
 
     def test_getting_all_variables(self, model):
         variable_names = list(model.supported_variables.keys())
