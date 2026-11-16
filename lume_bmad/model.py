@@ -58,50 +58,70 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
 
         """
         self._state = {}
+        self._state_initialized = False
+        self._initial_state = None
+        self._dump_locations = dump_locations
+        self._saved_at_initialized = False
+        self._track_start_validated = False
+        
         super().__init__(simulator=tao, action_variables=action_variables)
 
         self.comb_ds_save = comb_ds_save
         logger.debug("Initializing LUMEBmadModel with comb_ds_save=%s", comb_ds_save)
         self.simulator.cmd(f"set beam comb_ds_save = {self.comb_ds_save}")
 
-        # raise a warning if track_start is not the first element in the lattice
-        # NOTE: the first element in self.tao.lat_list("*", "ele.name") is "BEGINNING", so we grab the second element for the check
-        if self.tao.beam(0)["track_start"] != self.tao.lat_list("*", "ele.name")[1]:
-            msg = (
-                f"Warning: track_start is set to {self.tao.beam(0)['track_start']}, "
-                f"which is not the first element in the lattice {self.tao.lat_list('*', 'ele.name')[1]}. "
-                "This may lead to unexpected behavior if the initial particles "
-                "are not properly initialized at the track_start element."
-            )
-            logger.warning(msg)
-
         # Add model parameters read_only_variables
         model_output_variables = get_tao_output_variables(self.simulator)
-
         for var in model_output_variables:
             self.register_action_variable(var)
 
         # add track_type variable to control variables to allow toggling between single particle and beam tracking
         self.register_action_variable(TrackTypeAction())
 
-        # set dumping of beam distributions at the beginning and end of the lattice
-        self._dump_locations = dump_locations
-        elements = ",".join(dump_locations + ["BEGINNING", "END"])
-        self.simulator.cmd(f"set beam saved_at = {elements}")
-
         # Register dynamic outputs that depend on the current tracking mode.
         self._refresh_dynamic_action_variables()
 
-        # get initial state of the model
-        self.update_state()
-
-        self._initial_state = self._state.copy()
         logger.info(
             "Initialized LUMEBmadModel ",
         )
 
+    def _ensure_state_initialized(self) -> None:
+        """Lazily initialize state on first access."""
+        if not self._state_initialized:
+            logger.debug("Performing lazy state initialization")
+            self.update_state()
+            self._initial_state = self._state.copy()
+            self._state_initialized = True
+
+    def _ensure_saved_at_initialized(self) -> None:
+        """Lazily initialize saved_at beam locations on first tracking operation."""
+        if not self._saved_at_initialized and self._dump_locations:
+            logger.debug("Performing lazy saved_at initialization")
+            elements = ",".join(self._dump_locations + ["BEGINNING", "END"])
+            self.simulator.cmd(f"set beam saved_at = {elements}")
+            self._saved_at_initialized = True
+
+    def _validate_track_start(self) -> None:
+        """Validate track_start matches first element in lattice."""
+        if not self._track_start_validated:
+            logger.debug("Performing lazy track_start validation")
+            track_start = self.tao.beam(0)["track_start"]
+            lat_names = self.tao.lat_list("*", "ele.name")
+            if track_start != lat_names[1]:
+                msg = (
+                    f"Warning: track_start is set to {track_start}, "
+                    f"which is not the first element in the lattice {lat_names[1]}. "
+                    "This may lead to unexpected behavior if the initial particles "
+                    "are not properly initialized at the track_start element."
+                )
+                logger.warning(msg)
+            self._track_start_validated = True
+
     def _refresh_dynamic_action_variables(self) -> None:
         """Synchronize comb and dumped-beam action variables with the current track type."""
+        self._ensure_saved_at_initialized()
+        self._validate_track_start()
+        
         in_beam_mode = self.simulator.tao_global()["track_type"] == "beam"
 
         comb_names = list(TAO_COMB_OUTPUT_NAMES)
@@ -140,6 +160,7 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         dict[str, Any]
             Dictionary mapping variable names to their current values
         """
+        self._ensure_state_initialized()
         return {name: self._state[name] for name in names}
 
     def _set(self, values: dict[str, Any]) -> None:
@@ -157,6 +178,7 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             Dictionary of variable names and values to set
         """
         logger.debug("_set called with keys: %s", list(values.keys()))
+        self._ensure_state_initialized()
 
         # turn tao eager mode off to speed up setting multiple variables
         self.simulator.cmd("set global lattice_calc_on = F")
@@ -216,7 +238,8 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
         """
         Register an action variable with the model.
 
-        This method adds the variable to the supported variables and initializes its value in the state.
+        This method adds the variable to the supported variables and initializes its value in the state
+        if the state has already been initialized.
 
         Parameters
         ----------
@@ -224,7 +247,8 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
             The action variable to register
         """
         super().register_action_variable(variable)
-        self._state[variable.name] = variable._get(self.simulator)
+        if self._state_initialized:
+            self._state[variable.name] = variable._get(self.simulator)
 
     def update_state(self) -> None:
         """
@@ -318,6 +342,8 @@ class LUMEBmadModel(ActionModel, InitialParticlesMixIn, FinalParticlesMixIn):
     def reset(self):
         """Reset the model to its initial state."""
         logger.info("Resetting model to initial state")
+        
+        self._ensure_state_initialized()
 
         # get subset of initial state that corresponds to writable control variables
         control_variable_names = [
